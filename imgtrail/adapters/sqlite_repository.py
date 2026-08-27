@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS matches (
     UNIQUE(group_id, page_url, image_url)
 );
 CREATE INDEX IF NOT EXISTS matches_verdict ON matches(verdict);
+
+-- Rows written before page-only hits were rejected. They carry no image, so they can
+-- never be verified and can no longer be loaded as domain objects. Dropping them is
+-- lossless: every one of them was noise by construction.
+DELETE FROM matches WHERE image_url IS NULL OR image_url = '';
 """
 
 

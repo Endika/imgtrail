@@ -77,13 +77,35 @@ class TestSqliteRepository:
 
         repository.add(Photo(path="/a.png", fingerprint=Fingerprint("ff00ff00ff00ff00")))
         repository.assign_groups({1: 1})
-        repository.add_all(1, [Match(MatchKind.FULL, page_url="https://ex.com/p")])
+        repository.add_all(1, [Match(MatchKind.FULL, "https://ex.com/i.jpg", "https://ex.com/p")])
         pending, fingerprint = repository.awaiting_verdict()[0]
 
         repository.record(pending.judged(4))
 
         assert repository.tally() == {Verdict.CONFIRMED: 1}
         assert fingerprint == Fingerprint("ff00ff00ff00ff00")
+
+    def test_legacy_page_only_rows_are_dropped_on_open(self, tmp_path: Path) -> None:
+        """Databases written before page-only hits were rejected still hold them. They
+        carry no image, so they can never become domain objects — opening must clear them."""
+        import sqlite3
+
+        database = tmp_path / "old.db"
+        SqliteRepository(database).close()
+        legacy = sqlite3.connect(database)
+        legacy.execute("INSERT INTO photos(path, phash) VALUES ('/a.png', 'ff00ff00ff00ff00')")
+        legacy.execute("UPDATE photos SET group_id = id")
+        legacy.execute(
+            "INSERT INTO matches(group_id, page_url, image_url, kind, domain, verdict) "
+            "VALUES (1, 'https://noise.example/cumulus', NULL, 'partial', "
+            "'noise.example', 'unreachable')"
+        )
+        legacy.commit()
+        legacy.close()
+
+        with SqliteRepository(database) as reopened:
+            assert reopened.tally() == {}
+            assert reopened.findings([Verdict.CONFIRMED, Verdict.LIKELY]) == []
 
     def test_state_survives_reopening_the_file(
         self, tmp_path: Path, album: DictPhotoSource
@@ -122,21 +144,20 @@ class TestVisionAdapter:
         assert (
             Match(
                 MatchKind.FULL,
-                "https://blog.example.com/post",
                 "https://cdn.example.com/mine.jpg",
+                "https://blog.example.com/post",
                 "Used my photo",
             )
             in matches
         )
         assert any(m.kind is MatchKind.PARTIAL and m.domain == "forum.example.org" for m in matches)
 
-    def test_a_page_with_no_extracted_image_is_still_reported(self) -> None:
-        page = next(
-            m
-            for m in parse_web_detection(self.RESPONSE)
-            if m.page_url == "https://nolink.example.net/page"
-        )
-        assert page.image_url is None and page.kind is MatchKind.PARTIAL
+    def test_a_page_with_no_extracted_image_is_dropped(self) -> None:
+        """Vision lists pages it merely associates with the subject — a cloud photo comes
+        back with pages about cumulus. Unfetchable, unverifiable, and almost always noise."""
+        pages = {m.page_url for m in parse_web_detection(self.RESPONSE)}
+
+        assert "https://nolink.example.net/page" not in pages
 
     def test_visually_similar_images_are_dropped(self) -> None:
         urls = {m.image_url for m in parse_web_detection(self.RESPONSE)}
@@ -243,8 +264,8 @@ class TestReportWriters:
                 [
                     Match(
                         MatchKind.FULL,
-                        "https://good.example.com/p",
                         "https://good.example.com/i.jpg",
+                        "https://good.example.com/p",
                         "Real",
                     )
                 ]
@@ -287,8 +308,8 @@ class TestReportWriters:
         )
         nasty = Match(
             MatchKind.FULL,
+            "https://x.example.com/i.jpg",
             "https://x.example.com/p",
-            None,
             "<script>alert(1)</script>",
             Verdict.CONFIRMED,
             1,

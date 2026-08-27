@@ -23,7 +23,7 @@ def build(
 
 def blog(
     url: str = "https://blog.example.com/post",
-    image: str | None = "https://blog.example.com/i.jpg",
+    image: str = "https://blog.example.com/i.jpg",
 ) -> Match:
     return Match(MatchKind.FULL, page_url=url, image_url=image, title="A post")
 
@@ -102,8 +102,12 @@ class TestSearching:
             [
                 [
                     blog(),
-                    Match(MatchKind.FULL, page_url="https://www.instagram.com/p/abc"),
-                    Match(MatchKind.PARTIAL, image_url="https://scontent.cdninstagram.com/i.jpg"),
+                    Match(
+                        MatchKind.FULL,
+                        "https://i.instagram.com/x.jpg",
+                        page_url="https://www.instagram.com/p/abc",
+                    ),
+                    Match(MatchKind.PARTIAL, "https://scontent.cdninstagram.com/i.jpg"),
                 ]
             ]
         )
@@ -119,7 +123,16 @@ class TestSearching:
         self, repository: SqliteRepository, album: DictPhotoSource
     ) -> None:
         engine = FakeSearchEngine(
-            [[blog(), Match(MatchKind.FULL, page_url="https://pinterest.com/pin/1")]]
+            [
+                [
+                    blog(),
+                    Match(
+                        MatchKind.FULL,
+                        "https://i.pinimg.com/1.jpg",
+                        page_url="https://pinterest.com/pin/1",
+                    ),
+                ]
+            ]
         )
         service, _, _ = build(repository, album, engine)
         service.index(album)
@@ -216,15 +229,13 @@ class TestVerifying:
 
         assert service.verify(workers=2) == {Verdict.UNREACHABLE: 1}
 
-    def test_a_page_without_an_image_cannot_be_verified(
+    def test_an_unfetchable_url_is_unreachable_not_rejected(
         self, repository: SqliteRepository, album: DictPhotoSource
     ) -> None:
-        service, fetcher = self._scanned(
-            repository, album, [Match(MatchKind.PARTIAL, page_url="https://ex.com/p")], {}
-        )
+        service, fetcher = self._scanned(repository, album, [blog()], {})
 
         assert service.verify(workers=2) == {Verdict.UNREACHABLE: 1}
-        assert fetcher.requested == [], "nothing to download means no request"
+        assert fetcher.requested == ["https://blog.example.com/i.jpg"]
 
     def test_garbage_bytes_do_not_crash_the_run(
         self, repository: SqliteRepository, album: DictPhotoSource
