@@ -52,6 +52,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["imgtrail"]
+artifacts = ["imgtrail/py.typed"]
 
 [tool.hatch.build.targets.sdist]
 include = ["imgtrail", "tests", "README.md", "LICENSE"]
