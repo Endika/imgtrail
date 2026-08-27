@@ -4,6 +4,7 @@ __pycache__/
 build/
 dist/
 .venv/
+venv/
 .pytest_cache/
 .ruff_cache/
 
@@ -11,3 +12,6 @@ dist/
 imgtrail-data/
 *.html
 findings.json
+.coverage
+coverage.xml
+htmlcov/

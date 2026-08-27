@@ -88,6 +88,38 @@ Your photos are sent to Google Cloud Vision, and nowhere else. Nothing is upload
 server of mine — there isn't one. The database, the extracted export and the report all stay
 on your machine.
 
+## Architecture
+
+Ports and adapters, sized to the problem: the rules sit in the middle and know nothing
+about Google, SQLite or HTTP, so swapping a search backend touches exactly one file.
+
+```
+domain.py     fingerprints, grouping, verdicts, what counts as "your own platform"
+              — pure; no I/O, no SQL, no network
+ports.py      the boundaries: PhotoSource, ImageLoader, SearchEngine, ImageFetcher,
+              PhotoRepository, MatchRepository, ReportWriter
+services.py   the use cases: index, plan, search, verify, report
+adapters/     the details: sqlite_repository, vision, http_fetcher, local_files, html_report
+cli.py        the composition root — the one module that knows every layer
+```
+
+Adding TinEye or Yandex means writing one `SearchEngine` and wiring it in `cli.py`. Nothing
+in `domain.py` or `services.py` changes.
+
+## Development
+
+```bash
+uv sync --all-groups
+uv run pytest             # 85 tests, no network, no mocks
+uv run ruff check .
+uv run ruff format .
+uv run mypy               # strict, and it passes on the tests too
+```
+
+The test doubles are real implementations, not mocks: an in-memory `DictPhotoSource`, a
+`FakeSearchEngine` that records what it was asked, and — where the wire itself is what needs
+testing — a real local HTTP server speaking Vision's JSON.
+
 ## Licence
 
 MIT
