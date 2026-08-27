@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/Endika/imgtrail/compare/v0.1.0...v0.1.1) (2026-08-27)
+
+
+### Documentation
+
+* add badges so the project reads at a glance ([6da6d2a](https://github.com/Endika/imgtrail/commit/6da6d2aed63a054506c212fdcc3f013136ba63ce))
+
 ## 0.1.0 (2026-08-27)
 
 
