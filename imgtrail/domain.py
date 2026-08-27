@@ -88,16 +88,21 @@ class Match:
     """Somewhere a search engine claims one of your photos appears."""
 
     kind: MatchKind
+    image_url: str
     page_url: str | None = None
-    image_url: str | None = None
     title: str | None = None
     verdict: Verdict = Verdict.PENDING
     distance: int | None = None
     id: int | None = None
 
     def __post_init__(self) -> None:
-        if self.page_url is None and self.image_url is None:
-            raise ValueError("a match needs a page or an image to point at")
+        # A claim we cannot fetch is a claim we cannot check, and the whole point of
+        # this tool is that nothing reaches the report unverified. Search engines do
+        # return page-only hits; they are dominated by topical noise (a photo of a
+        # cloud comes back with pages *about* cumulus) and there is no way to tell
+        # those from a real one. So they are not matches, and cannot be built.
+        if not self.image_url:
+            raise ValueError("a match needs an image url, or it can never be verified")
 
     @property
     def domain(self) -> str | None:
@@ -107,8 +112,8 @@ class Match:
 
     @property
     def target(self) -> str:
-        # __post_init__ guarantees at least one of the two is set.
-        return self.page_url or self.image_url or ""
+        """Where to send a reader: the page if we know it, the image otherwise."""
+        return self.page_url or self.image_url
 
     def judged(self, distance: int) -> Match:
         return replace(self, verdict=verdict_for(distance), distance=distance)
@@ -123,6 +128,9 @@ OWN_PLATFORMS = frozenset(
         "cdninstagram.com",
         "facebook.com",
         "fbcdn.net",
+        # Meta's own crawler proxy, which serves Instagram content back under a
+        # Facebook domain — your own profile wearing a different hat.
+        "fbsbx.com",
         "threads.net",
         "threads.com",
         "whatsapp.com",

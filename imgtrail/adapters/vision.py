@@ -38,14 +38,18 @@ def parse_web_detection(web: dict[str, Any]) -> list[Match]:
 
     `pagesWithMatchingImages` is the useful part: it pairs a page with the image on it.
     Top-level `fullMatchingImages` catches hosted copies Google never tied to a page.
-    `visuallySimilarImages` is dropped on purpose — it means "looks alike", not "is your
-    photo", and it drowns the report in false positives.
+
+    Two kinds of entry are dropped on purpose. `visuallySimilarImages` means "looks
+    alike", not "is your photo". And pages Vision lists without naming an image on
+    them are topical associations pulled from its best guess at the subject, not
+    copies — a photo of a cloud comes back with pages about cumulus. Neither can be
+    verified, so neither is kept.
     """
     matches: list[Match] = []
     seen: set[tuple[str | None, str | None]] = set()
 
     def push(kind: MatchKind, page: str | None, image: str | None, title: str | None) -> None:
-        if (page or image) and (page, image) not in seen:
+        if image and (page, image) not in seen:
             seen.add((page, image))
             matches.append(Match(kind=kind, page_url=page, image_url=image, title=title))
 
@@ -53,8 +57,6 @@ def parse_web_detection(web: dict[str, Any]) -> list[Match]:
         url, title = page.get("url"), page.get("pageTitle")
         images = [(i.get("url"), MatchKind.FULL) for i in page.get("fullMatchingImages", [])]
         images += [(i.get("url"), MatchKind.PARTIAL) for i in page.get("partialMatchingImages", [])]
-        if not images:
-            push(MatchKind.PARTIAL, url, None, title)
         for image_url, kind in images:
             push(kind, url, image_url, title)
 

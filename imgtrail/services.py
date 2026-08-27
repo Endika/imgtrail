@@ -157,8 +157,6 @@ class ScanService:
         return tally
 
     def _judge(self, match: Match, original: Fingerprint) -> Match:
-        if not match.image_url:
-            return match.unreachable()
         downloaded = self._fetcher.fetch(match.image_url)
         if downloaded is None:
             return match.unreachable()

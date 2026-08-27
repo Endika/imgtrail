@@ -52,30 +52,38 @@ class TestVerdict:
 
 
 class TestMatch:
-    def test_a_match_must_point_somewhere(self) -> None:
-        with pytest.raises(ValueError, match="page or an image"):
-            Match(kind=MatchKind.FULL)
+    def test_a_match_we_could_never_fetch_cannot_be_built(self) -> None:
+        with pytest.raises(ValueError, match="never be verified"):
+            Match(kind=MatchKind.FULL, image_url="")
 
     def test_domain_strips_www_and_lowercases(self) -> None:
-        assert Match(MatchKind.FULL, page_url="https://www.Example.COM/x").domain == "example.com"
+        match = Match(MatchKind.FULL, "https://cdn.x.com/a.jpg", "https://www.Example.COM/x")
+        assert match.domain == "example.com"
 
     def test_domain_falls_back_to_the_image_when_there_is_no_page(self) -> None:
-        assert Match(MatchKind.FULL, image_url="https://cdn.ex.com/a.jpg").domain == "cdn.ex.com"
+        assert Match(MatchKind.FULL, "https://cdn.ex.com/a.jpg").domain == "cdn.ex.com"
 
     def test_judging_is_pure(self) -> None:
-        original = Match(MatchKind.FULL, page_url="https://ex.com")
+        original = Match(MatchKind.FULL, "https://ex.com/a.jpg")
         judged = original.judged(3)
         assert judged.verdict == Verdict.CONFIRMED and judged.distance == 3
         assert original.verdict == Verdict.PENDING, "the original must not be mutated"
 
     def test_unreachable_forgets_any_distance(self) -> None:
-        judged = Match(MatchKind.FULL, page_url="https://ex.com").judged(3)
+        judged = Match(MatchKind.FULL, "https://ex.com/a.jpg").judged(3)
         assert judged.unreachable().distance is None
 
 
 class TestOwnPlatforms:
     @pytest.mark.parametrize(
-        "domain", ["instagram.com", "scontent-mad1-1.cdninstagram.com", "www.facebook.com"]
+        "domain",
+        [
+            "instagram.com",
+            "scontent-mad1-1.cdninstagram.com",
+            "www.facebook.com",
+            # Meta's crawler proxy: seen serving a real profile in the wild.
+            "lookaside.fbsbx.com",
+        ],
     )
     def test_your_own_platforms_are_not_findings(self, domain: str) -> None:
         assert is_own_platform(domain.removeprefix("www."))
