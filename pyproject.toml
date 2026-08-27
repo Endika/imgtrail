@@ -34,10 +34,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/endika/imgtrail"
-Repository = "https://github.com/endika/imgtrail"
-Issues = "https://github.com/endika/imgtrail/issues"
-Changelog = "https://github.com/endika/imgtrail/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/Endika/imgtrail"
+Repository = "https://github.com/Endika/imgtrail"
+Issues = "https://github.com/Endika/imgtrail/issues"
+Changelog = "https://github.com/Endika/imgtrail/blob/main/CHANGELOG.md"
 
 [project.scripts]
 imgtrail = "imgtrail.cli:main"
