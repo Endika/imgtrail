@@ -18,7 +18,7 @@ jobs:
       released: ${{ steps.release.outputs.release_created }}
       tag: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           release-type: python
@@ -34,7 +34,7 @@ jobs:
     permissions:
       id-token: write  # trusted publishing; no API token is stored anywhere
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.please.outputs.tag }}
       - uses: astral-sh/setup-uv@v7
