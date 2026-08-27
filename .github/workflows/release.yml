@@ -22,6 +22,11 @@ jobs:
         id: release
         with:
           release-type: python
+          # With GITHUB_TOKEN the release pull request is authored by the bot, and
+          # GitHub fires no `pull_request` workflows for it — the required checks
+          # sit at "action_required" forever and auto-merge can never proceed.
+          # A PAT makes the pull request yours, so CI runs on it normally.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
   publish:
     name: publish to PyPI
