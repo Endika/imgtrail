@@ -1,5 +1,12 @@
 # imgtrail
 
+[![PyPI](https://img.shields.io/pypi/v/imgtrail)](https://pypi.org/project/imgtrail/)
+[![Python](https://img.shields.io/pypi/pyversions/imgtrail)](https://pypi.org/project/imgtrail/)
+[![CI](https://github.com/Endika/imgtrail/actions/workflows/ci.yml/badge.svg)](https://github.com/Endika/imgtrail/actions/workflows/ci.yml)
+[![Licence](https://img.shields.io/pypi/l/imgtrail)](LICENSE)
+[![Checked with mypy](https://img.shields.io/badge/mypy-strict-2a6db2)](https://mypy-lang.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 Find out where else on the web your own photos show up.
 
 Point it at your Instagram data export. It hashes every photo, collapses the near-duplicates
