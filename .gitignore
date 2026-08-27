@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# imgtrail state and output
+imgtrail-data/
+*.html
+findings.json
