@@ -5,6 +5,9 @@ on: pull_request_target
 permissions:
   contents: read
 
+# Neither job ever checks out the pull request's code, so running with
+# `pull_request_target` (and therefore with access to secrets) stays safe.
+
 jobs:
   dependabot:
     name: auto-merge dependabot
@@ -26,3 +29,22 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    name: auto-merge release-please
+    if: startsWith(github.event.pull_request.head.ref, 'release-please--')
+    runs-on: ubuntu-latest
+    steps:
+      # The token MUST be a PAT, not GITHUB_TOKEN. A merge signed by GITHUB_TOKEN
+      # produces a push that triggers no workflows at all, so Release would never
+      # run, no tag would be cut, and nothing would reach PyPI — silently.
+      - name: queue the merge behind the required checks
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::RELEASE_PLEASE_TOKEN is not set — leaving this release to be merged by hand."
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PR_URL"
