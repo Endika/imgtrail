@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Endika/imgtrail/compare/v0.1.1...v0.1.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* only keep search hits that can actually be verified ([#5](https://github.com/Endika/imgtrail/issues/5)) ([62692bf](https://github.com/Endika/imgtrail/commit/62692bfffb9b9aaf6513ce48ba6a14945d82dbd7))
+
 ## [0.1.1](https://github.com/Endika/imgtrail/compare/v0.1.0...v0.1.1) (2026-08-27)
 
 
