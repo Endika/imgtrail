@@ -100,6 +100,17 @@ class TestPlanning:
         assert [p.path for p in plan.pending] == ["/album/b.png"]
         assert plan.flat == 1
 
+    def test_a_plan_stays_inside_the_source_it_was_pointed_at(
+        self, repository: SqliteRepository
+    ) -> None:
+        """Pointing at seven photos must not plan a search over the whole database."""
+        both = DictPhotoSource({"/album/a.png": image_bytes(1), "/other/x.png": image_bytes(42)})
+        service, _, _ = build(repository, both)
+        service.index(both)
+
+        assert [p.path for p in service.plan(under="/other/").pending] == ["/other/x.png"]
+        assert len(service.plan()) == 2, "unscoped, it still covers everything"
+
     def test_again_plans_the_photos_already_paid_for(
         self, repository: SqliteRepository, album: DictPhotoSource
     ) -> None:

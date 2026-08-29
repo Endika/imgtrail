@@ -85,6 +85,7 @@ imgtrail scan SOURCE          index, dedupe, search and verify — resumable
   --limit N                   search at most N unique photos
   --threshold N               pHash distance for "same photo" (default 6)
   --ignore-domain DOMAIN      exclude a domain from results (repeatable)
+  --again                     search everything again, paying for it again
   --no-verify                 skip the download-and-compare pass
 imgtrail reparse              re-read the stored answers under today's filters
   --ignore-domain DOMAIN      exclude a domain from results (repeatable)
@@ -93,7 +94,9 @@ imgtrail status               what's in the database so far
 ```
 
 State lives in `./imgtrail-data`. Everything is idempotent: re-running `scan` searches only
-what it hasn't searched before, so an interrupted run costs nothing to resume.
+what it hasn't searched before, so an interrupted run costs nothing to resume. A scan stays
+inside the source you point it at — the database may hold other folders, and they are not
+what you asked to search.
 
 Every answer a search engine gives is kept verbatim. Filtering is a pile of judgement calls —
 which platforms are yours, which candidates are worth downloading — and at least one of them

@@ -113,24 +113,22 @@ class SqliteRepository:
         )
         self._conn.commit()
 
-    def representatives_awaiting_search(self) -> list[Photo]:
-        return [
-            Photo(
-                id=row["id"],
-                path=row["path"],
-                fingerprint=Fingerprint(row["phash"]),
-                group_id=row["id"],
-            )
-            for row in self._conn.execute(
-                """SELECT p.id, p.path, p.phash FROM photos p
-                   LEFT JOIN searches s ON s.group_id = p.id
-                   WHERE p.group_id = p.id AND s.group_id IS NULL
-                   ORDER BY p.id"""
-            )
-        ]
+    def representatives_awaiting_search(self, under: str | None = None) -> list[Photo]:
+        return self._representatives(
+            """LEFT JOIN searches s ON s.group_id = p.id
+               WHERE p.group_id = p.id AND s.group_id IS NULL""",
+            under,
+        )
 
-    def representatives(self) -> list[Photo]:
+    def representatives(self, under: str | None = None) -> list[Photo]:
         """Every group, searched or not — what `--again` asks for."""
+        return self._representatives("WHERE p.group_id = p.id", under)
+
+    def _representatives(self, clause: str, under: str | None) -> list[Photo]:
+        """One group per row, optionally only those whose photo sits under a path."""
+        scope, arguments = "", []
+        if under is not None:
+            scope, arguments = "AND p.path LIKE ? || '%'", [under]
         return [
             Photo(
                 id=row["id"],
@@ -139,7 +137,8 @@ class SqliteRepository:
                 group_id=row["id"],
             )
             for row in self._conn.execute(
-                "SELECT id, path, phash FROM photos WHERE group_id = id ORDER BY id"
+                f"SELECT p.id, p.path, p.phash FROM photos p {clause} {scope} ORDER BY p.id",
+                arguments,
             )
         ]
 

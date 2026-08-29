@@ -99,7 +99,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"([dim]{indexed.duplicates_saved} duplicate searches saved[/])"
         )
 
-        plan = service.plan(args.limit, again=args.again)
+        plan = service.plan(args.limit, again=args.again, under=source.prefix)
         if plan.flat:
             left_out = "photo" if plan.flat == 1 else "photos"
             console.print(
