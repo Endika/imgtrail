@@ -84,33 +84,38 @@ class FakeSearchEngine:
         for _ in images:
             matches = self._answers.pop(0) if self._answers else []
             answers.append(
-                SearchAnswer(
-                    matches=tuple(matches),
-                    payload=json.dumps(
-                        [
-                            {
-                                "kind": m.kind.value,
-                                "image_url": m.image_url,
-                                "page_url": m.page_url,
-                                "title": m.title,
-                            }
-                            for m in matches
-                        ]
-                    ),
+                self.parse(
+                    json.dumps(
+                        {
+                            "matches": [
+                                {
+                                    "kind": m.kind.value,
+                                    "image_url": m.image_url,
+                                    "page_url": m.page_url,
+                                    "title": m.title,
+                                }
+                                for m in matches
+                            ],
+                        }
+                    )
                 )
             )
         return answers
 
-    def parse(self, payload: str) -> list[Match]:
-        return [
-            Match(
-                kind=MatchKind(entry["kind"]),
-                image_url=entry["image_url"],
-                page_url=entry["page_url"],
-                title=entry["title"],
-            )
-            for entry in json.loads(payload)
-        ]
+    def parse(self, payload: str) -> SearchAnswer:
+        body = json.loads(payload)
+        return SearchAnswer(
+            matches=tuple(
+                Match(
+                    kind=MatchKind(entry["kind"]),
+                    image_url=entry["image_url"],
+                    page_url=entry["page_url"],
+                    title=entry["title"],
+                )
+                for entry in body["matches"]
+            ),
+            payload=payload,
+        )
 
     def estimated_cost(self, units: int, already_used: int = 0) -> float:
         return 0.0

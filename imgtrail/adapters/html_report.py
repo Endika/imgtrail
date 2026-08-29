@@ -50,6 +50,8 @@ a:hover { text-decoration:underline; }
          text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
 .badge.ok { color:var(--ok); background:var(--ok-bg); }
 .badge.warn { color:var(--warn); background:var(--warn-bg); }
+.badge.lead { color:var(--muted); background:var(--line); }
+h2.section { font-size:1.1rem; margin:2.5rem 0 .3rem; letter-spacing:-.01em; }
 .dom { font-weight:600; }
 .empty { padding:3rem; text-align:center; color:var(--muted); background:var(--card);
          border:1px solid var(--line); border-radius:10px; }
@@ -70,10 +72,12 @@ class HtmlReportWriter:
                 converted = opened.convert("RGB")
                 converted.thumbnail((self._px, self._px))
                 buffer = io.BytesIO()
-                converted.save(buffer, format="PNG", optimize=True)
+                # JPEG, not PNG: these are photographs, and one card per lead means a
+                # hundred of them on a page. PNG made that report 3.4 MB.
+                converted.save(buffer, format="JPEG", quality=80, optimize=True)
         except (OSError, ValueError):
             return ""
-        return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+        return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
 
     def _render(self, report: Report) -> str:
         escape = html.escape
@@ -108,6 +112,29 @@ class HtmlReportWriter:
             '<div class="empty">None of your photos turned up on another site.</div>'
         )
 
+        traces = []
+        for entry in report.unverified:
+            items = [
+                f'<li><span class="badge lead">unreachable</span>'
+                f'<span class="dom">{escape(lead.domain or "")}</span>'
+                f'<a href="{escape(lead.page_url)}" target="_blank" rel="noreferrer">'
+                f"{escape((lead.title or lead.page_url)[:110])}</a></li>"
+                for lead in entry.leads
+            ]
+            traces.append(
+                f'<div class="card"><img src="{self._thumbnail(entry.photo.path)}" alt="">'
+                f"<div><h2>{escape(Path(entry.photo.path).name)}</h2>"
+                f'<p class="meta">{len(entry.leads)} places that could not be checked</p>'
+                f"<ul>{''.join(items)}</ul></div></div>"
+            )
+        if traces:
+            body += (
+                '<h2 class="section">Found, but not verified</h2>'
+                '<p class="sub">The search named an image on these pages and the site would '
+                "not serve it, so nothing could be compared. Places to look with your own "
+                "eyes — not findings.</p>" + "".join(traces)
+            )
+
         summary, tally = report.summary, report.summary.tally
         tiles = [
             ("Photos", summary.photos),
@@ -115,7 +142,8 @@ class HtmlReportWriter:
             ("Searched", summary.searched),
             ("Confirmed", tally.get(Verdict.CONFIRMED, 0)),
             ("Likely", tally.get(Verdict.LIKELY, 0)),
-            ("Discarded", tally.get(Verdict.REJECTED, 0) + tally.get(Verdict.UNREACHABLE, 0)),
+            ("Unverified", sum(len(e.leads) for e in report.unverified)),
+            ("Discarded", tally.get(Verdict.REJECTED, 0)),
         ]
         stats = "".join(f'<div class="stat"><b>{v}</b><span>{k}</span></div>' for k, v in tiles)
 
@@ -138,6 +166,20 @@ class JsonReportWriter:
                 "searched": report.summary.searched,
                 "tally": {v.value: n for v, n in report.summary.tally.items()},
             },
+            "unverified": [
+                {
+                    "photo": entry.photo.path,
+                    "leads": [
+                        {
+                            "page_url": lead.page_url,
+                            "title": lead.title,
+                            "domain": lead.domain,
+                        }
+                        for lead in entry.leads
+                    ],
+                }
+                for entry in report.unverified
+            ],
             "findings": [
                 {
                     "photo": finding.photo.path,

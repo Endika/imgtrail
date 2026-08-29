@@ -32,6 +32,11 @@ indirectly, via one of the many "Instagram viewer" mirror sites that *are* index
 WhatsApp, TikTok and private accounts are invisible to it too. If your question is "is someone
 reposting me inside Instagram", this is the wrong tool and there isn't a good one.
 
+What it cannot prove, it says so. A candidate the search named and the site would not serve
+— TikTok, Facebook's lookaside — is listed apart under **"found, but not verified"**: a place
+to go and look, not a claim. Pages named with no image at all are not kept: of the page-level
+claims that could be checked against the original, 9.6% held.
+
 Your own Facebook page is not filtered out: from a group post there is no telling whose it is.
 If you cross-post everything from Instagram, `--ignore-domain facebook.com`.
 

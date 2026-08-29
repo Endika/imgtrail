@@ -42,10 +42,10 @@ def parse_web_detection(web: dict[str, Any]) -> list[Match]:
     included, since a repost is usually a crop.
 
     Two kinds of entry are dropped on purpose. `visuallySimilarImages` means "looks
-    alike", not "is your photo". And pages Vision lists without naming an image on
-    them are topical associations pulled from its best guess at the subject, not
-    copies — a photo of a cloud comes back with pages about cumulus. Neither can be
-    verified, so neither is kept.
+    alike", not "is your photo". And pages Vision lists without naming an image on them
+    are topical associations, not copies: of its page-level claims that could be checked
+    against the original, 9.6% held, and a landscape photo comes back with thirty-five
+    YouTube videos. Neither can be verified, and neither is worth a reader's time.
     """
     matches: list[Match] = []
     seen: set[tuple[str | None, str | None]] = set()
@@ -97,8 +97,9 @@ class VisionSearchEngine:
         billable = max(0, units + already_used - FREE_UNITS_PER_MONTH)
         return round(billable * PRICE_PER_1K / 1000, 2)
 
-    def parse(self, payload: str) -> list[Match]:
-        return parse_web_detection(json.loads(payload))
+    def parse(self, payload: str) -> SearchAnswer:
+        web = json.loads(payload)
+        return SearchAnswer(matches=tuple(parse_web_detection(web)), payload=payload)
 
     def search(self, images: Sequence[bytes]) -> list[SearchAnswer]:
         if not self._key:
@@ -123,8 +124,5 @@ class VisionSearchEngine:
             for item in response.json().get("responses", []):
                 if "error" in item:
                     raise RuntimeError(item["error"].get("message", "Vision API error"))
-                web = item.get("webDetection", {})
-                results.append(
-                    SearchAnswer(matches=tuple(parse_web_detection(web)), payload=json.dumps(web))
-                )
+                results.append(self.parse(json.dumps(item.get("webDetection", {}))))
         return results

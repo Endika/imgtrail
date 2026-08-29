@@ -135,6 +135,28 @@ class Match:
 
 
 @dataclass(frozen=True, slots=True)
+class Lead:
+    """A candidate that was named and would not come down.
+
+    Not every unproven trace deserves this. Vision also lists pages it merely associates
+    with the subject, and measured against the ones we could check, 9.6% of its page-level
+    claims hold — a landscape comes back with thirty-five YouTube videos. Those are noise
+    and are dropped. These are different: the engine pointed at an actual image, and the
+    site refused to serve it (tiktok, Facebook's lookaside). One such trace, checked by
+    hand, was the photo it claimed to be.
+
+    It is still not a finding. It is a place to go and look."""
+
+    page_url: str
+    title: str | None = None
+
+    @property
+    def domain(self) -> str | None:
+        host = urlparse(self.page_url or "").hostname or ""
+        return host.removeprefix("www.").lower() or None
+
+
+@dataclass(frozen=True, slots=True)
 class SearchAnswer:
     """What an engine said about one photo: the matches, and the words it said them in.
 
@@ -156,12 +178,17 @@ OWN_PLATFORMS = frozenset(
         "messenger.com",
     }
 )
-"""Finding your photo on Instagram is not a finding. Neither is its own CDN.
+"""Platforms whose hits are not worth carrying, and the honest reason why.
 
-Facebook is not on this list, and used to be. A stranger reposting your picture in a
-Facebook group is exactly what this tool exists to find, and `lookaside.fbsbx.com`
-serves the image of *any* public post, not just your own — so blocking it cost real
-findings. If you cross-post to your own page, `--ignore-domain facebook.com`."""
+It is not "these are yours": a repost by a stranger is a finding wherever it happens.
+It is that Instagram and Threads hand their images to nobody — `lookaside.instagram.com`
+answers a login wall to every agent — so nothing found there can ever be compared, and
+an unverifiable hit belongs in the leads, not in the report.
+
+Facebook is not on this list, and used to be, on the "these are yours" reasoning. A
+stranger reposting your picture in a Facebook group is exactly what this tool exists to
+find, and `lookaside.fbsbx.com` does serve the image of any public post — so blocking it
+cost real findings. If you cross-post to your own page, `--ignore-domain facebook.com`."""
 
 
 def is_own_platform(domain: str | None, platforms: Iterable[str] = OWN_PLATFORMS) -> bool:
@@ -208,6 +235,14 @@ class Finding:
 
 
 @dataclass(frozen=True, slots=True)
+class Unverified:
+    """One of your photos, and the places that could not be checked either way."""
+
+    photo: Photo
+    leads: tuple[Lead, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Summary:
     photos: int
     unique: int
@@ -223,3 +258,4 @@ class Summary:
 class Report:
     summary: Summary
     findings: tuple[Finding, ...]
+    unverified: tuple[Unverified, ...] = ()

@@ -10,7 +10,7 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from .domain import Fingerprint, Match, Photo, Report, SearchAnswer, Summary, Verdict
+from .domain import Fingerprint, Lead, Match, Photo, Report, SearchAnswer, Summary, Verdict
 
 
 @runtime_checkable
@@ -37,7 +37,7 @@ class SearchEngine(Protocol):
     def search(self, images: Sequence[bytes]) -> list[SearchAnswer]:
         """Answer once per image, in the order given. Costs money; call it sparingly."""
 
-    def parse(self, payload: str) -> list[Match]:
+    def parse(self, payload: str) -> SearchAnswer:
         """Re-read one of its own payloads. Free, and the reason payloads are kept."""
 
     def estimated_cost(self, units: int, already_used: int = 0) -> float: ...
@@ -77,6 +77,9 @@ class PhotoRepository(Protocol):
 @runtime_checkable
 class MatchRepository(Protocol):
     def add_all(self, group_id: int, matches: Sequence[Match]) -> int: ...
+    def leads(self) -> list[tuple[int, Lead]]:
+        """Candidates that could not be downloaded. Derived, never written."""
+
     def awaiting_verdict(self) -> list[tuple[Match, Fingerprint]]: ...
     def record(self, match: Match) -> None: ...
     def findings(self, verdicts: Sequence[Verdict]) -> list[tuple[int, Match]]: ...
