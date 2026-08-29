@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/Endika/imgtrail/compare/v0.5.0...v0.5.1) (2026-08-29)
+
+
+### Documentation
+
+* bring the readme up to what the tool now does ([26e56e1](https://github.com/Endika/imgtrail/commit/26e56e13709e63a0ebf1f9fa9013c1f8e7f5838c))
+* rewrite the readme so it reads in order and says each thing once ([7839e89](https://github.com/Endika/imgtrail/commit/7839e8988c20b13fe2b8a92a454d3b739416788c))
+
 ## [0.5.0](https://github.com/Endika/imgtrail/compare/v0.4.1...v0.5.0) (2026-08-29)
 
 

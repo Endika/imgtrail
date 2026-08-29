@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "imgtrail"
-version = "0.5.0"
+version = "0.5.1"
 description = "Find out where else on the web your own photos show up"
 readme = "README.md"
 requires-python = ">=3.10"
