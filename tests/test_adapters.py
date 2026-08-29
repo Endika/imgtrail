@@ -383,7 +383,7 @@ class TestReportWriters:
 
         page = out.read_text(encoding="utf-8")
         assert "good.example.com" in page
-        assert "data:image/png;base64," in page
+        assert "data:image/jpeg;base64," in page
 
     def test_html_survives_a_thumbnail_it_cannot_read(
         self, repository: SqliteRepository, album: DictPhotoSource, tmp_path: Path
@@ -393,6 +393,25 @@ class TestReportWriters:
         HtmlReportWriter(FileImageLoader()).write(self._report(repository, album), out)
 
         assert 'img src=""' in out.read_text(encoding="utf-8")
+
+    def test_html_keeps_what_could_not_be_checked_in_its_own_section(
+        self, repository: SqliteRepository, album: DictPhotoSource, tmp_path: Path
+    ) -> None:
+        engine = FakeSearchEngine(
+            [[Match(MatchKind.FULL, "https://tiktok.com/i.jpg", "https://tiktok.com/@a/video/1")]]
+        )
+        service = ScanService(repository, repository, engine, album, DictImageFetcher(), repository)
+        service.index(album)
+        service.search(service.plan())
+        service.verify(workers=1)
+        out = tmp_path / "report.html"
+
+        HtmlReportWriter(album).write(ReportService(repository, repository).build(), out)
+
+        page = out.read_text(encoding="utf-8")
+        assert "Found, but not verified" in page
+        assert "tiktok.com/@a/video/1" in page
+        assert "None of your photos turned up" in page, "a lead is not counted as a finding"
 
     def test_html_escapes_a_hostile_page_title(
         self, album: DictPhotoSource, tmp_path: Path
@@ -509,7 +528,7 @@ class TestVisionOverHttp:
         [answer] = engine.search([image_bytes(1)])
         engine.close()
 
-        assert engine.parse(answer.payload) == list(answer.matches)
+        assert engine.parse(answer.payload) == answer
 
     def test_an_api_error_is_raised_not_swallowed(self) -> None:
         sent: list[dict[str, Any]] = []

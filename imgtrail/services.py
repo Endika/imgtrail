@@ -11,10 +11,12 @@ from .domain import (
     SAME_PHOTO_DISTANCE,
     Finding,
     Fingerprint,
+    Lead,
     Match,
     Photo,
     Report,
     Summary,
+    Unverified,
     Verdict,
     group_by_similarity,
     is_own_platform,
@@ -165,12 +167,11 @@ class ScanService:
         platforms = frozenset(own_platforms)
         added = 0
         for group_id, payload in self._archive.all():
-            fresh = [
-                match
-                for match in self._engine.parse(payload)
-                if not is_own_platform(match.domain, platforms)
-            ]
-            added += self._matches.add_all(group_id, fresh)
+            answer = self._engine.parse(payload)
+            added += self._matches.add_all(
+                group_id,
+                [m for m in answer.matches if not is_own_platform(m.domain, platforms)],
+            )
         return added
 
     def verify(
@@ -241,4 +242,20 @@ class ReportService:
                 tally=self._matches.tally(),
             ),
             findings=tuple(findings),
+            unverified=self._unverified(),
         )
+
+    def _unverified(self) -> tuple[Unverified, ...]:
+        """Traces worth a look that no comparison can settle. Never mixed with findings."""
+        rows = self._matches.leads()
+        photos = self._photos.by_ids(sorted({group_id for group_id, _ in rows}))
+        by_group: dict[int, list[Lead]] = {}
+        for group_id, lead in rows:
+            if group_id in photos and not photos[group_id].fingerprint.is_degenerate:
+                by_group.setdefault(group_id, []).append(lead)
+        traces = [
+            Unverified(photo=photos[group_id], leads=tuple(leads))
+            for group_id, leads in by_group.items()
+        ]
+        traces.sort(key=lambda t: (-len(t.leads), t.photo.path))
+        return tuple(traces)

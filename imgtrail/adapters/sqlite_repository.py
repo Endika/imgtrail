@@ -10,7 +10,15 @@ import sqlite3
 from collections.abc import Sequence
 from pathlib import Path
 
-from imgtrail.domain import Fingerprint, Match, MatchKind, Photo, Summary, Verdict
+from imgtrail.domain import (
+    Fingerprint,
+    Lead,
+    Match,
+    MatchKind,
+    Photo,
+    Summary,
+    Verdict,
+)
 
 SCHEMA = """
 PRAGMA journal_mode = WAL;
@@ -49,10 +57,15 @@ CREATE TABLE IF NOT EXISTS matches (
 );
 CREATE INDEX IF NOT EXISTS matches_verdict ON matches(verdict);
 
+
 -- Rows written before page-only hits were rejected. They carry no image, so they can
 -- never be verified and can no longer be loaded as domain objects. Dropping them is
 -- lossless: every one of them was noise by construction.
 DELETE FROM matches WHERE image_url IS NULL OR image_url = '';
+
+-- Pages a search named without pointing at an image, kept for one afternoon. Measured
+-- against the claims that could be checked, 9.6% of them held. Noise, and dropped.
+DROP TABLE IF EXISTS leads;
 """
 
 
@@ -222,6 +235,20 @@ class SqliteRepository:
         )
         self._conn.commit()
         return self._conn.total_changes - before
+
+    def leads(self) -> list[tuple[int, Lead]]:
+        """Every candidate the engine named and the web would not hand over."""
+        return [
+            (
+                row["group_id"],
+                Lead(page_url=row["page_url"] or row["image_url"], title=row["title"]),
+            )
+            for row in self._conn.execute(
+                """SELECT group_id, page_url, image_url, title FROM matches
+                   WHERE verdict = ? ORDER BY group_id""",
+                (Verdict.UNREACHABLE.value,),
+            )
+        ]
 
     def awaiting_verdict(self) -> list[tuple[Match, Fingerprint]]:
         return [

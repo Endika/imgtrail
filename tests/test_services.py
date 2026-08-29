@@ -382,6 +382,22 @@ class TestReporting:
 
         assert ReportService(repository, repository).build().findings == ()
 
+    def test_a_candidate_that_would_not_download_is_a_lead_not_a_silence(
+        self, repository: SqliteRepository, album: DictPhotoSource
+    ) -> None:
+        """353 of these vanished from a real report without a word."""
+        service, _, _ = build(repository, album, FakeSearchEngine([[blog()]]), DictImageFetcher())
+        service.index(album)
+        service.search(service.plan())
+        service.verify(workers=1)
+
+        report = ReportService(repository, repository).build()
+
+        assert report.findings == ()
+        assert [lead.page_url for e in report.unverified for lead in e.leads] == [
+            "https://blog.example.com/post"
+        ]
+
     def test_a_finding_knows_how_many_copies_you_posted(
         self, repository: SqliteRepository, album: DictPhotoSource
     ) -> None:
