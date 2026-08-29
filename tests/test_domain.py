@@ -68,6 +68,11 @@ class TestMatch:
         with pytest.raises(ValueError, match="never be verified"):
             Match(kind=MatchKind.FULL, image_url="")
 
+    def test_a_match_we_could_never_request_cannot_be_built(self) -> None:
+        """Google answers with `x-raw-image://` for images inside cached documents."""
+        with pytest.raises(ValueError, match="GET"):
+            Match(MatchKind.FULL, "x-raw-image:///b7a2d7e75d25d886")
+
     def test_domain_strips_www_and_lowercases(self) -> None:
         match = Match(MatchKind.FULL, "https://cdn.x.com/a.jpg", "https://www.Example.COM/x")
         assert match.domain == "example.com"

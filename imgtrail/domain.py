@@ -10,6 +10,7 @@ import io
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 from enum import Enum
+from typing import TypeGuard
 from urllib.parse import urlparse
 
 import imagehash
@@ -17,6 +18,14 @@ from PIL import Image, ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 Image.MAX_IMAGE_PIXELS = 200_000_000
+
+FETCHABLE_SCHEMES = frozenset({"http", "https"})
+"""Search engines answer with `x-raw-image://` and other things nobody can GET."""
+
+
+def is_fetchable(url: str | None) -> TypeGuard[str]:
+    return bool(url) and urlparse(url).scheme in FETCHABLE_SCHEMES
+
 
 SAME_PHOTO_DISTANCE = 6
 """Below this, two of your own files are the same shot: a carousel frame, a re-export."""
@@ -113,8 +122,8 @@ class Match:
         # return page-only hits; they are dominated by topical noise (a photo of a
         # cloud comes back with pages *about* cumulus) and there is no way to tell
         # those from a real one. So they are not matches, and cannot be built.
-        if not self.image_url:
-            raise ValueError("a match needs an image url, or it can never be verified")
+        if not is_fetchable(self.image_url):
+            raise ValueError("a match needs an image url we can GET, or it can never be verified")
 
     @property
     def domain(self) -> str | None:

@@ -65,6 +65,10 @@ CREATE INDEX IF NOT EXISTS matches_verdict ON matches(verdict);
 -- lossless: every one of them was noise by construction.
 DELETE FROM matches WHERE image_url IS NULL OR image_url = '';
 
+-- And rows whose image cannot be requested at all: `x-raw-image://` and friends. They
+-- can never be verified, and one of them ends a verification run rather than a candidate.
+DELETE FROM matches WHERE image_url NOT LIKE 'http://%' AND image_url NOT LIKE 'https://%';
+
 -- Pages a search named without pointing at an image, kept for one afternoon. Measured
 -- against the claims that could be checked, 9.6% of them held. Noise, and dropped.
 DROP TABLE IF EXISTS leads;
