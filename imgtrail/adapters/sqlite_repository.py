@@ -162,25 +162,43 @@ class SqliteRepository:
         self._conn.commit()
 
     def representatives_awaiting_search(
-        self, under: str | None = None, engine: str | None = None
+        self,
+        under: str | None = None,
+        engine: str | None = None,
+        only_blank: bool = False,
     ) -> list[Photo]:
-        """Awaiting *this* engine: a photo Vision has seen is still new to Lens."""
+        """Awaiting *this* engine: a photo Vision has seen is still new to Lens.
+
+        `only_blank` narrows it to photos nothing has ever been found on. A second engine
+        is the expensive one, and the first engine drawing a blank is the only evidence
+        available about where it is worth spending."""
+        blank = self._blank(only_blank)
         if engine is None:
             return self._representatives(
                 """LEFT JOIN searches s ON s.group_id = p.id
-                   WHERE p.group_id = p.id AND s.group_id IS NULL""",
+                   WHERE p.group_id = p.id AND s.group_id IS NULL"""
+                + blank,
                 under,
             )
         return self._representatives(
             """LEFT JOIN searches s ON s.group_id = p.id AND s.engine = :engine
-               WHERE p.group_id = p.id AND s.group_id IS NULL""",
+               WHERE p.group_id = p.id AND s.group_id IS NULL"""
+            + blank,
             under,
             {"engine": engine},
         )
 
-    def representatives(self, under: str | None = None) -> list[Photo]:
+    def representatives(self, under: str | None = None, only_blank: bool = False) -> list[Photo]:
         """Every group, searched or not — what `--again` asks for."""
-        return self._representatives("WHERE p.group_id = p.id", under)
+        return self._representatives("WHERE p.group_id = p.id" + self._blank(only_blank), under)
+
+    @staticmethod
+    def _blank(only_blank: bool) -> str:
+        """Photos nothing has been found on. Leads and rejects do not count as found."""
+        if not only_blank:
+            return ""
+        return """ AND NOT EXISTS (SELECT 1 FROM matches m
+                     WHERE m.group_id = p.id AND m.verdict IN ('confirmed', 'likely'))"""
 
     def _representatives(
         self, clause: str, under: str | None, extra: dict[str, str] | None = None
