@@ -64,6 +64,21 @@ def _source_tally(source: LocalPhotoSource, indexed: IndexResult) -> str:
     return " · ".join(parts)
 
 
+def _verify(service: ScanService, repository: SqliteRepository, workers: int) -> None:
+    outstanding = len(repository.awaiting_verdict())
+    if not outstanding:
+        return
+    with _progress() as bar:
+        task = bar.add_task("Verifying", total=outstanding)
+        tally = service.verify(workers, on_result=lambda: bar.advance(task))
+    console.print(
+        f"[green]{tally.get(Verdict.CONFIRMED, 0)}[/] confirmed · "
+        f"[yellow]{tally.get(Verdict.LIKELY, 0)}[/] likely · "
+        f"[dim]{tally.get(Verdict.REJECTED, 0)} rejected, "
+        f"{tally.get(Verdict.UNREACHABLE, 0)} unreachable[/]"
+    )
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
     data_dir = Path(args.data_dir)
     source = LocalPhotoSource(Path(args.source).expanduser(), data_dir)
@@ -71,7 +86,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
     fetcher = HttpImageFetcher()
 
     with _repository(data_dir) as repository:
-        service = ScanService(repository, repository, engine, source, fetcher)
+        service = ScanService(repository, repository, engine, source, fetcher, repository)
 
         indexed = service.index(source, args.threshold)
         if indexed.total == 0:
@@ -122,22 +137,38 @@ def cmd_scan(args: argparse.Namespace) -> int:
             )
 
             if not args.no_verify:
-                outstanding = len(repository.awaiting_verdict())
-                if outstanding:
-                    with _progress() as bar:
-                        task = bar.add_task("Verifying", total=outstanding)
-                        tally = service.verify(args.workers, on_result=lambda: bar.advance(task))
-                    console.print(
-                        f"[green]{tally.get(Verdict.CONFIRMED, 0)}[/] confirmed · "
-                        f"[yellow]{tally.get(Verdict.LIKELY, 0)}[/] likely · "
-                        f"[dim]{tally.get(Verdict.REJECTED, 0)} rejected, "
-                        f"{tally.get(Verdict.UNREACHABLE, 0)} unreachable[/]"
-                    )
+                _verify(service, repository, args.workers)
         finally:
             engine.close()
             fetcher.close()
 
     console.print(f"\nDone. Run [bold]imgtrail report --data-dir {data_dir}[/] for the report.")
+    return 0
+
+
+def cmd_reparse(args: argparse.Namespace) -> int:
+    """Re-read the answers already paid for. The filters may have been wrong; the money
+    was still spent, and this is what makes correcting them free."""
+    data_dir = Path(args.data_dir)
+    engine = VisionSearchEngine()
+    fetcher = HttpImageFetcher()
+    with _repository(data_dir) as repository:
+        service = ScanService(
+            repository, repository, engine, FileImageLoader(), fetcher, repository
+        )
+        try:
+            recovered = service.reparse(OWN_PLATFORMS | frozenset(args.ignore_domain or []))
+            answers = len(repository.all())
+            console.print(
+                f"[bold]{recovered}[/] candidates recovered from {answers} stored answers "
+                f"[dim](no search, no cost)[/]"
+            )
+            if not args.no_verify:
+                _verify(service, repository, args.workers)
+        finally:
+            engine.close()
+            fetcher.close()
+    console.print(f"\nDone. Run [bold]imgtrail --data-dir {data_dir} report[/] for the report.")
     return 0
 
 
@@ -207,6 +238,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--workers", type=int, default=8, help="parallel downloads during verification (default 8)"
     )
     scan.set_defaults(func=cmd_scan)
+
+    reparse = sub.add_parser(
+        "reparse", help="re-read the stored answers under today's filters, without searching"
+    )
+    reparse.add_argument(
+        "--ignore-domain",
+        action="append",
+        metavar="DOMAIN",
+        help="extra domain to exclude from results (repeatable)",
+    )
+    reparse.add_argument(
+        "--no-verify", action="store_true", help="skip downloading candidates to confirm them"
+    )
+    reparse.add_argument(
+        "--workers", type=int, default=8, help="parallel downloads during verification (default 8)"
+    )
+    reparse.set_defaults(func=cmd_reparse)
 
     report = sub.add_parser("report", help="build the HTML report")
     report.add_argument("--out", default="imgtrail.html")

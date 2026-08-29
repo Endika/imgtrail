@@ -23,7 +23,7 @@ def build(
 ) -> tuple[ScanService, FakeSearchEngine, DictImageFetcher]:
     engine = engine or FakeSearchEngine()
     fetcher = fetcher or DictImageFetcher()
-    service = ScanService(repository, repository, engine, album, fetcher)
+    service = ScanService(repository, repository, engine, album, fetcher, repository)
     return service, engine, fetcher
 
 
@@ -201,6 +201,38 @@ class TestSearching:
         service.search(service.plan(), on_batch=seen.append)
 
         assert sum(seen) == 3
+
+
+class TestReparsing:
+    def test_correcting_a_filter_costs_no_search(
+        self, repository: SqliteRepository, album: DictPhotoSource
+    ) -> None:
+        """The point of keeping the payload: the money was spent, the judgement was wrong."""
+        engine = FakeSearchEngine([[blog()]])
+        service, _, _ = build(repository, album, engine)
+        service.index(album)
+        service.search(service.plan(), own_platforms={"blog.example.com"})
+        assert repository.tally() == {}, "the filter of the day threw it away"
+        paid_for = engine.calls
+
+        recovered = service.reparse(own_platforms=set())
+
+        assert recovered == 1
+        assert engine.calls == paid_for, "a reparse must never reach the engine"
+        assert {m.domain for m, _ in repository.awaiting_verdict()} == {"blog.example.com"}
+
+    def test_an_existing_verdict_is_not_thrown_away(
+        self, repository: SqliteRepository, album: DictPhotoSource
+    ) -> None:
+        engine = FakeSearchEngine([[blog()]])
+        fetcher = DictImageFetcher({"https://blog.example.com/i.jpg": album.images["/album/a.png"]})
+        service, _, _ = build(repository, album, engine, fetcher)
+        service.index(album)
+        service.search(service.plan())
+        service.verify(workers=1)
+
+        assert service.reparse() == 0
+        assert repository.tally() == {Verdict.CONFIRMED: 1}
 
 
 class TestVerifying:

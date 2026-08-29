@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS searches (
     done_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS responses (
+    group_id INTEGER PRIMARY KEY,
+    engine   TEXT NOT NULL,
+    payload  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS matches (
     id        INTEGER PRIMARY KEY,
     group_id  INTEGER NOT NULL REFERENCES photos(id),
@@ -163,6 +169,25 @@ class SqliteRepository:
                 "SELECT group_id, COUNT(*) AS n FROM photos GROUP BY group_id"
             )
         }
+
+    # --- ResponseArchive --------------------------------------------------
+
+    def save(self, group_id: int, engine: str, payload: str) -> None:
+        self._conn.execute(
+            """INSERT INTO responses(group_id, engine, payload) VALUES (?, ?, ?)
+               ON CONFLICT(group_id) DO UPDATE SET engine = excluded.engine,
+                                                   payload = excluded.payload""",
+            (group_id, engine, payload),
+        )
+        self._conn.commit()
+
+    def all(self) -> list[tuple[int, str]]:
+        return [
+            (row["group_id"], row["payload"])
+            for row in self._conn.execute(
+                "SELECT group_id, payload FROM responses ORDER BY group_id"
+            )
+        ]
 
     # --- MatchRepository -------------------------------------------------
 

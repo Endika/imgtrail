@@ -25,6 +25,7 @@ from .ports import (
     MatchRepository,
     PhotoRepository,
     PhotoSource,
+    ResponseArchive,
     SearchEngine,
 )
 
@@ -64,12 +65,14 @@ class ScanService:
         engine: SearchEngine,
         loader: ImageLoader,
         fetcher: ImageFetcher,
+        archive: ResponseArchive,
     ) -> None:
         self._photos = photos
         self._matches = matches
         self._engine = engine
         self._loader = loader
         self._fetcher = fetcher
+        self._archive = archive
 
     def index(self, source: PhotoSource, threshold: int = SAME_PHOTO_DISTANCE) -> IndexResult:
         """Fingerprint everything new, then collapse the near-duplicates into groups."""
@@ -128,14 +131,33 @@ class ScanService:
         for start in range(0, len(plan.pending), batch):
             chunk = plan.pending[start : start + batch]
             images = [self._loader.load(photo.path) for photo in chunk]
-            for photo, matches in zip(chunk, self._engine.search(images), strict=True):
+            for photo, answer in zip(chunk, self._engine.search(images), strict=True):
                 assert photo.id is not None
-                keep = [m for m in matches if not is_own_platform(m.domain, platforms)]
+                # Archived before the search is marked done: a crash in between must never
+                # leave a search paid for and its answer thrown away.
+                self._archive.save(photo.id, self._engine.name, answer.payload)
+                keep = [m for m in answer.matches if not is_own_platform(m.domain, platforms)]
                 stored += self._matches.add_all(photo.id, keep)
                 self._photos.mark_searched(photo.id, self._engine.name)
             if on_batch:
                 on_batch(len(chunk))
         return stored
+
+    def reparse(self, own_platforms: Iterable[str] = OWN_PLATFORMS) -> int:
+        """Re-read every answer already paid for, under today's filters. Calls nothing.
+
+        Existing matches keep their verdict — only pairs the old filters dropped are added,
+        and they come back as pending, so a verify picks them up."""
+        platforms = frozenset(own_platforms)
+        added = 0
+        for group_id, payload in self._archive.all():
+            fresh = [
+                match
+                for match in self._engine.parse(payload)
+                if not is_own_platform(match.domain, platforms)
+            ]
+            added += self._matches.add_all(group_id, fresh)
+        return added
 
     def verify(
         self,
