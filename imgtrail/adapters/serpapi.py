@@ -18,7 +18,7 @@ from typing import Any
 import httpx
 from PIL import Image
 
-from imgtrail.domain import Match, MatchKind, SearchAnswer
+from imgtrail.domain import Match, MatchKind, SearchAnswer, is_fetchable
 
 UPLOAD_ENDPOINT = "https://serpapi.com/image"
 SEARCH_ENDPOINT = "https://serpapi.com/search"
@@ -56,7 +56,7 @@ def parse_visual_matches(body: dict[str, Any]) -> list[Match]:
     seen: set[tuple[str | None, str]] = set()
     for entry in body.get("visual_matches", []):
         image_url, page = entry.get("image"), entry.get("link")
-        if not image_url or (page, image_url) in seen:
+        if not is_fetchable(image_url) or (page, image_url) in seen:
             continue
         seen.add((page, image_url))
         matches.append(

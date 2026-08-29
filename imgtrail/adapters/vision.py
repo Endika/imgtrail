@@ -16,7 +16,7 @@ from typing import Any
 import httpx
 from PIL import Image
 
-from imgtrail.domain import Match, MatchKind, SearchAnswer
+from imgtrail.domain import Match, MatchKind, SearchAnswer, is_fetchable
 
 ENDPOINT = "https://vision.googleapis.com/v1/images:annotate"
 PRICE_PER_1K = 3.50
@@ -52,7 +52,7 @@ def parse_web_detection(web: dict[str, Any]) -> list[Match]:
     seen: set[tuple[str | None, str | None]] = set()
 
     def push(kind: MatchKind, page: str | None, image: str | None, title: str | None) -> None:
-        if image and (page, image) not in seen:
+        if is_fetchable(image) and (page, image) not in seen:
             seen.add((page, image))
             matches.append(Match(kind=kind, page_url=page, image_url=image, title=title))
 

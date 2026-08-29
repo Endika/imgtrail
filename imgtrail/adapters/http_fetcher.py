@@ -47,7 +47,11 @@ class HttpImageFetcher:
         try:
             response = self._client.get(url, headers={"User-Agent": crawler} if crawler else None)
             response.raise_for_status()
-        except httpx.HTTPError:
+        except (httpx.HTTPError, httpx.InvalidURL, ValueError):
+            # ValueError on purpose: httpx asks urllib to build the cookie header, and
+            # urllib raises it on a scheme it does not know. One `x-raw-image://` row from
+            # a search engine ended a run of 1123 verifications that way. A candidate we
+            # cannot even ask for is a candidate we cannot check — nothing more than that.
             return None
         if not response.headers.get("content-type", "").startswith("image/"):
             return None

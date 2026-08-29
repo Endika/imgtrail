@@ -13,6 +13,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from PIL import Image
 
@@ -70,6 +71,25 @@ class TestSqliteRepository:
         repository.add(photo)
 
         assert len(repository.fingerprints()) == 1
+
+    def test_a_stored_row_nobody_can_request_is_dropped_on_open(self, tmp_path: Path) -> None:
+        """It was already written before the check existed, and it ends a verify run."""
+        database = tmp_path / "old.db"
+        old = sqlite3.connect(database)
+        old.executescript(
+            """CREATE TABLE matches (id INTEGER PRIMARY KEY, group_id INTEGER NOT NULL,
+                   page_url TEXT, image_url TEXT, title TEXT, kind TEXT NOT NULL,
+                   domain TEXT, verdict TEXT NOT NULL DEFAULT 'pending', distance INTEGER,
+                   UNIQUE(group_id, page_url, image_url));
+               INSERT INTO matches(group_id, image_url, kind)
+                   VALUES (1, 'x-raw-image:///a', 'full'),
+                          (1, 'https://ok.example.com/i.jpg', 'full');"""
+        )
+        old.commit()
+        old.close()
+
+        with SqliteRepository(database) as cleaned:
+            assert [m.image_url for m in cleaned.matches_for(1)] == ["https://ok.example.com/i.jpg"]
 
     def test_a_second_engine_does_not_overwrite_the_first(
         self, repository: SqliteRepository
@@ -327,6 +347,17 @@ class TestHttpFetcher:
         with HttpImageFetcher() as fetcher:
             assert fetcher.fetch(f"{base}/page.html") is None
 
+    def test_a_url_it_cannot_even_request_is_unreachable_not_a_crash(self) -> None:
+        """One `x-raw-image://` row from a search engine killed a run of 1123 verifications.
+
+        The cookie jar is what makes it fatal: httpx hands the URL to urllib to build the
+        cookie header, and urllib refuses a scheme it does not know. A jar fills up halfway
+        through any real run, so this is the state that matters."""
+        client = httpx.Client(cookies={"session": "whatever"})
+
+        with HttpImageFetcher(client=client) as fetcher:
+            assert fetcher.fetch("x-raw-image:///b7a2d7e75d25d8868796667039b8984") is None
+
     def test_a_host_that_only_answers_crawlers_is_asked_as_one(
         self, crawler_server: tuple[Path, str]
     ) -> None:
@@ -363,6 +394,11 @@ class TestSerpApiAdapter:
             == "https://www.facebook.com/groups/703828331595169/posts/1262367775741219/"
         )
         assert match.kind is MatchKind.PARTIAL, "Lens never says it matched the whole frame"
+
+    def test_an_image_url_nobody_can_request_is_skipped(self) -> None:
+        odd = {"visual_matches": [{"link": "https://p", "image": "x-raw-image:///abc"}]}
+
+        assert parse_visual_matches(odd) == []
 
     def test_an_entry_with_no_image_is_not_a_match(self) -> None:
         assert len(parse_visual_matches(self.RESPONSE)) == 1
