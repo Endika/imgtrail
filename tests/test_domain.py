@@ -80,15 +80,23 @@ class TestOwnPlatforms:
         [
             "instagram.com",
             "scontent-mad1-1.cdninstagram.com",
-            "www.facebook.com",
-            # Meta's crawler proxy: seen serving a real profile in the wild.
-            "lookaside.fbsbx.com",
+            "threads.net",
         ],
     )
     def test_your_own_platforms_are_not_findings(self, domain: str) -> None:
         assert is_own_platform(domain.removeprefix("www."))
 
-    @pytest.mark.parametrize("domain", ["notinstagram.com", "pinterest.com", None])
+    @pytest.mark.parametrize(
+        "domain",
+        [
+            "notinstagram.com",
+            "pinterest.com",
+            None,
+            # A repost in a Facebook group is a stranger's, and the finding we are after.
+            "facebook.com",
+            "lookaside.fbsbx.com",
+        ],
+    )
     def test_everything_else_is(self, domain: str | None) -> None:
         assert not is_own_platform(domain)
 

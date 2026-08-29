@@ -126,18 +126,18 @@ OWN_PLATFORMS = frozenset(
     {
         "instagram.com",
         "cdninstagram.com",
-        "facebook.com",
-        "fbcdn.net",
-        # Meta's own crawler proxy, which serves Instagram content back under a
-        # Facebook domain — your own profile wearing a different hat.
-        "fbsbx.com",
         "threads.net",
         "threads.com",
         "whatsapp.com",
         "messenger.com",
     }
 )
-"""Finding your photo on Instagram is not a finding. Neither is its own CDN."""
+"""Finding your photo on Instagram is not a finding. Neither is its own CDN.
+
+Facebook is not on this list, and used to be. A stranger reposting your picture in a
+Facebook group is exactly what this tool exists to find, and `lookaside.fbsbx.com`
+serves the image of *any* public post, not just your own — so blocking it cost real
+findings. If you cross-post to your own page, `--ignore-domain facebook.com`."""
 
 
 def is_own_platform(domain: str | None, platforms: Iterable[str] = OWN_PLATFORMS) -> bool:
