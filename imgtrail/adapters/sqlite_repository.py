@@ -129,6 +129,28 @@ class SqliteRepository:
             )
         ]
 
+    def representatives(self) -> list[Photo]:
+        """Every group, searched or not — what `--again` asks for."""
+        return [
+            Photo(
+                id=row["id"],
+                path=row["path"],
+                fingerprint=Fingerprint(row["phash"]),
+                group_id=row["id"],
+            )
+            for row in self._conn.execute(
+                "SELECT id, path, phash FROM photos WHERE group_id = id ORDER BY id"
+            )
+        ]
+
+    def searched_this_month(self) -> int:
+        """The free tier resets with the calendar month, so the all-time count misprices a run."""
+        row = self._conn.execute(
+            """SELECT COUNT(*) AS n FROM searches
+               WHERE strftime('%Y-%m', done_at) = strftime('%Y-%m', 'now')"""
+        ).fetchone()
+        return int(row["n"])
+
     def mark_searched(self, group_id: int, engine: str) -> None:
         self._conn.execute(
             "INSERT INTO searches(group_id, engine) VALUES (?, ?) ON CONFLICT(group_id) DO NOTHING",

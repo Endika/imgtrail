@@ -62,6 +62,18 @@ class TestSqliteRepository:
 
         assert len(repository.fingerprints()) == 1
 
+    def test_an_older_months_searches_are_not_charged_to_this_one(
+        self, repository: SqliteRepository
+    ) -> None:
+        """The free tier resets with the calendar month; mispricing it is real money."""
+        repository.mark_searched(1, "fake")
+        repository.mark_searched(2, "fake")
+        # Reaching for SQL because the age of a row is exactly what is under test.
+        repository._conn.execute("UPDATE searches SET done_at = '2020-01-01' WHERE group_id = 2")
+
+        assert repository.searched_this_month() == 1
+        assert repository.counts().searched == 2, "the all-time count is untouched"
+
     def test_matches_are_deduplicated_per_group(self, repository: SqliteRepository) -> None:
         from imgtrail.domain import Photo
 
