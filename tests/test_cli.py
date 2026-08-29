@@ -74,6 +74,28 @@ class TestScan:
 
         assert "would run 1 searches" in capsys.readouterr().out.replace("\n", " ")
 
+    def test_the_run_says_what_it_never_looked_at(
+        self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        avatars = album_dir / "profile"
+        avatars.mkdir()
+        (avatars / "avatar.png").write_bytes(image_bytes(3))
+
+        run(tmp_path, "scan", str(album_dir), "--dry-run")
+
+        out = capsys.readouterr().out.replace("\n", " ")
+        assert "4 images in the source" in out
+        assert "1 skipped (1 in profile)" in out
+
+    def test_the_run_reconciles_searches_against_unique_photos(
+        self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        run(tmp_path, "scan", str(album_dir), "--dry-run")
+
+        assert "would leave 2 of 2 unique photos searched" in capsys.readouterr().out.replace(
+            "\n", " "
+        )
+
     def test_state_is_reused_across_invocations(
         self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:

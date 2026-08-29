@@ -250,6 +250,20 @@ class TestLocalFiles:
 
         assert sorted(Path(p).parent.name for p in found) == ["other", "posts"]
 
+    def test_every_picture_it_passes_over_is_counted(self, tmp_path: Path) -> None:
+        export = tmp_path / "export" / "media"
+        for folder, count in (("posts", 2), ("profile", 3), ("messages", 1)):
+            (export / folder).mkdir(parents=True)
+            for n in range(count):
+                (export / folder / f"{n}.png").write_bytes(image_bytes(n))
+        (export / "posts" / "caption.txt").write_text("not a picture")
+        source = LocalPhotoSource(tmp_path / "export", tmp_path / "work")
+
+        handed_over = list(source.photos())
+
+        assert len(handed_over) == source.taken == 2
+        assert source.skipped == {"profile": 3, "messages": 1}
+
     def test_a_zip_export_is_unpacked_once(self, tmp_path: Path) -> None:
         archive = tmp_path / "export.zip"
         with zipfile.ZipFile(archive, "w") as zf:
