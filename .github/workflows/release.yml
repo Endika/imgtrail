@@ -19,10 +19,12 @@ jobs:
       released: ${{ steps.release.outputs.release_created }}
       tag: ${{ steps.release.outputs.tag_name }}
     steps:
+      # Manifest mode — release-please-config.json and .release-please-manifest.json —
+      # so `extra-files` can bump uv.lock as well. The lockfile carries the version too,
+      # and a release that moves one and not the other leaves it dirty in every checkout.
       - uses: googleapis/release-please-action@v5
         id: release
         with:
-          release-type: python
           # With GITHUB_TOKEN the release pull request is authored by the bot, and
           # GitHub fires no `pull_request` workflows for it — the required checks
           # sit at "action_required" forever and auto-merge can never proceed.
