@@ -71,6 +71,8 @@ class FakeSearchEngine:
 
     name = "fake"
     batch_size = 2  # small on purpose, so batching is actually exercised
+    free_units_per_month = 1000
+    price_per_1k = 0.0
 
     def __init__(self, answers: Sequence[list[Match]] | None = None) -> None:
         self._answers = list(answers or [])

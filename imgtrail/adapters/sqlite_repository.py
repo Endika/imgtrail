@@ -32,15 +32,17 @@ CREATE TABLE IF NOT EXISTS photos (
 CREATE INDEX IF NOT EXISTS photos_group ON photos(group_id);
 
 CREATE TABLE IF NOT EXISTS searches (
-    group_id INTEGER PRIMARY KEY,
+    group_id INTEGER NOT NULL,
     engine   TEXT NOT NULL,
-    done_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    done_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (group_id, engine)
 );
 
 CREATE TABLE IF NOT EXISTS responses (
-    group_id INTEGER PRIMARY KEY,
+    group_id INTEGER NOT NULL,
     engine   TEXT NOT NULL,
-    payload  TEXT NOT NULL
+    payload  TEXT NOT NULL,
+    PRIMARY KEY (group_id, engine)
 );
 
 CREATE TABLE IF NOT EXISTS matches (
@@ -90,7 +92,36 @@ class SqliteRepository:
         self._conn = sqlite3.connect(database, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Both tables were keyed by photo alone, from when there was one engine.
+
+        A second engine would have overwritten the first one's record and its archived
+        answer. Rebuilt keyed by (photo, engine); the rows already there keep their engine
+        name, so nothing is lost and nothing is searched twice."""
+        for table, columns in (
+            ("searches", "group_id, engine, done_at"),
+            ("responses", "group_id, engine, payload"),
+        ):
+            keyed = [
+                row["name"]
+                for row in sorted(
+                    (r for r in self._conn.execute(f"PRAGMA table_info({table})") if r["pk"]),
+                    key=lambda r: int(r["pk"]),
+                )
+            ]
+            if keyed == ["group_id", "engine"]:
+                continue
+            fresh = SCHEMA[SCHEMA.index(f"CREATE TABLE IF NOT EXISTS {table} (") :]
+            fresh = fresh[: fresh.index(");") + 2]
+            self._conn.executescript(
+                f"ALTER TABLE {table} RENAME TO {table}_old;\n"
+                f"{fresh}\n"
+                f"INSERT INTO {table}({columns}) SELECT {columns} FROM {table}_old;\n"
+                f"DROP TABLE {table}_old;"
+            )
 
     def close(self) -> None:
         self._conn.close()
@@ -126,22 +157,35 @@ class SqliteRepository:
         )
         self._conn.commit()
 
-    def representatives_awaiting_search(self, under: str | None = None) -> list[Photo]:
+    def representatives_awaiting_search(
+        self, under: str | None = None, engine: str | None = None
+    ) -> list[Photo]:
+        """Awaiting *this* engine: a photo Vision has seen is still new to Lens."""
+        if engine is None:
+            return self._representatives(
+                """LEFT JOIN searches s ON s.group_id = p.id
+                   WHERE p.group_id = p.id AND s.group_id IS NULL""",
+                under,
+            )
         return self._representatives(
-            """LEFT JOIN searches s ON s.group_id = p.id
+            """LEFT JOIN searches s ON s.group_id = p.id AND s.engine = :engine
                WHERE p.group_id = p.id AND s.group_id IS NULL""",
             under,
+            {"engine": engine},
         )
 
     def representatives(self, under: str | None = None) -> list[Photo]:
         """Every group, searched or not — what `--again` asks for."""
         return self._representatives("WHERE p.group_id = p.id", under)
 
-    def _representatives(self, clause: str, under: str | None) -> list[Photo]:
+    def _representatives(
+        self, clause: str, under: str | None, extra: dict[str, str] | None = None
+    ) -> list[Photo]:
         """One group per row, optionally only those whose photo sits under a path."""
-        scope, arguments = "", []
+        scope, arguments = "", dict(extra or {})
         if under is not None:
-            scope, arguments = "AND p.path LIKE ? || '%'", [under]
+            scope = "AND p.path LIKE :under || '%'"
+            arguments["under"] = under
         return [
             Photo(
                 id=row["id"],
@@ -170,17 +214,27 @@ class SqliteRepository:
             )
         ]
 
-    def searched_this_month(self) -> int:
-        """The free tier resets with the calendar month, so the all-time count misprices a run."""
+    def searched_by(self, engine: str) -> int:
+        """How many photos this engine has already covered. Another engine's work is not its."""
         row = self._conn.execute(
-            """SELECT COUNT(*) AS n FROM searches
-               WHERE strftime('%Y-%m', done_at) = strftime('%Y-%m', 'now')"""
+            "SELECT COUNT(*) AS n FROM searches WHERE engine = ?", (engine,)
+        ).fetchone()
+        return int(row["n"])
+
+    def searched_this_month(self, engine: str | None = None) -> int:
+        """The free tier resets with the calendar month, and is per engine."""
+        clause = "" if engine is None else "AND engine = :engine"
+        row = self._conn.execute(
+            f"""SELECT COUNT(*) AS n FROM searches
+                WHERE strftime('%Y-%m', done_at) = strftime('%Y-%m', 'now') {clause}""",
+            {"engine": engine} if engine else {},
         ).fetchone()
         return int(row["n"])
 
     def mark_searched(self, group_id: int, engine: str) -> None:
         self._conn.execute(
-            "INSERT INTO searches(group_id, engine) VALUES (?, ?) ON CONFLICT(group_id) DO NOTHING",
+            """INSERT INTO searches(group_id, engine) VALUES (?, ?)
+               ON CONFLICT(group_id, engine) DO NOTHING""",
             (group_id, engine),
         )
         self._conn.commit()
@@ -189,7 +243,7 @@ class SqliteRepository:
         one = self._conn.execute(
             """SELECT (SELECT COUNT(*) FROM photos) AS photos,
                       (SELECT COUNT(*) FROM photos WHERE id = group_id) AS unique_photos,
-                      (SELECT COUNT(*) FROM searches) AS searched"""
+                      (SELECT COUNT(DISTINCT group_id) FROM searches) AS searched"""
         ).fetchone()
         return Summary(
             photos=one["photos"], unique=one["unique_photos"], searched=one["searched"], tally={}
@@ -224,23 +278,28 @@ class SqliteRepository:
     def save(self, group_id: int, engine: str, payload: str) -> None:
         self._conn.execute(
             """INSERT INTO responses(group_id, engine, payload) VALUES (?, ?, ?)
-               ON CONFLICT(group_id) DO UPDATE SET engine = excluded.engine,
-                                                   payload = excluded.payload""",
+               ON CONFLICT(group_id, engine) DO UPDATE SET payload = excluded.payload""",
             (group_id, engine, payload),
         )
         self._conn.commit()
 
-    def answer_for(self, group_id: int) -> str | None:
-        row = self._conn.execute(
-            "SELECT payload FROM responses WHERE group_id = ?", (group_id,)
-        ).fetchone()
-        return str(row["payload"]) if row else None
+    def answers_for(self, group_id: int) -> list[tuple[str, str]]:
+        """Every engine's answer about one photo, for `trace`."""
+        return [
+            (row["engine"], row["payload"])
+            for row in self._conn.execute(
+                "SELECT engine, payload FROM responses WHERE group_id = ? ORDER BY engine",
+                (group_id,),
+            )
+        ]
 
-    def all(self) -> list[tuple[int, str]]:
+    def all(self, engine: str) -> list[tuple[int, str]]:
+        """One engine's answers. A payload can only be re-read by the engine that wrote it."""
         return [
             (row["group_id"], row["payload"])
             for row in self._conn.execute(
-                "SELECT group_id, payload FROM responses ORDER BY group_id"
+                "SELECT group_id, payload FROM responses WHERE engine = ? ORDER BY group_id",
+                (engine,),
             )
         ]
 

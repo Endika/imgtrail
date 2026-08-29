@@ -114,16 +114,16 @@ class ScanService:
         awaiting = (
             self._photos.representatives(under)
             if again
-            else self._photos.representatives_awaiting_search(under)
+            else self._photos.representatives_awaiting_search(under, self._engine.name)
         )
         pending = [photo for photo in awaiting if not photo.fingerprint.is_degenerate]
         flat = len(awaiting) - len(pending)
         if limit is not None:
             pending = pending[:limit]
-        spent = self._photos.searched_this_month()
+        spent = self._photos.searched_this_month(self._engine.name)
         return ScanPlan(
             pending=tuple(pending),
-            already_searched=0 if again else self._photos.counts().searched,
+            already_searched=0 if again else self._photos.searched_by(self._engine.name),
             engine_name=self._engine.name,
             cost=self._engine.estimated_cost(len(pending), spent),
             flat=flat,
@@ -166,7 +166,7 @@ class ScanService:
         and they come back as pending, so a verify picks them up."""
         platforms = frozenset(own_platforms)
         added = 0
-        for group_id, payload in self._archive.all():
+        for group_id, payload in self._archive.all(self._engine.name):
             answer = self._engine.parse(payload)
             added += self._matches.add_all(
                 group_id,

@@ -17,22 +17,39 @@ from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from .adapters.html_report import HtmlReportWriter, JsonReportWriter
 from .adapters.http_fetcher import HttpImageFetcher
 from .adapters.local_files import FileImageLoader, LocalPhotoSource
+from .adapters.serpapi import LensSearchEngine
 from .adapters.sqlite_repository import SqliteRepository
-from .adapters.vision import FREE_UNITS_PER_MONTH, PRICE_PER_1K, VisionSearchEngine, explain
-from .domain import OWN_PLATFORMS, Verdict
+from .adapters.vision import VisionSearchEngine, explain
+from .domain import OWN_PLATFORMS, Match, Verdict
+from .ports import SearchEngine
 from .services import IndexResult, ReportService, ScanService
 
 console = Console()
 
-API_KEY_HELP = (
-    "[red]No API key.[/] Pass --api-key or export IMGTRAIL_API_KEY.\n"
-    "Create one at console.cloud.google.com → APIs & Services → Credentials, "
-    "with the Cloud Vision API enabled."
-)
+API_KEY_HELP = {
+    "vision": (
+        "[red]No API key.[/] Pass --api-key or export IMGTRAIL_API_KEY.\n"
+        "Create one at console.cloud.google.com → APIs & Services → Credentials, "
+        "with the Cloud Vision API enabled."
+    ),
+    "lens": (
+        "[red]No API key.[/] Pass --api-key or export SERPAPI_KEY.\n"
+        "Create one at serpapi.com/manage-api-key — the free plan is 250 searches a month."
+    ),
+}
 
 
-def _api_key(explicit: str | None) -> str:
-    return explicit or os.environ.get("IMGTRAIL_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
+def _api_key(explicit: str | None, engine: str = "vision") -> str:
+    if explicit:
+        return explicit
+    if engine == "lens":
+        return os.environ.get("SERPAPI_KEY") or ""
+    return os.environ.get("IMGTRAIL_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
+
+
+def _engine(name: str, key: str = "") -> SearchEngine:
+    """Two indexes that disagree. Vision is cheap and wide; Lens sees what Vision cannot."""
+    return LensSearchEngine(key) if name == "lens" else VisionSearchEngine(key)
 
 
 def _repository(data_dir: Path) -> SqliteRepository:
@@ -82,7 +99,7 @@ def _verify(service: ScanService, repository: SqliteRepository, workers: int) ->
 def cmd_scan(args: argparse.Namespace) -> int:
     data_dir = Path(args.data_dir)
     source = LocalPhotoSource(Path(args.source).expanduser(), data_dir)
-    engine = VisionSearchEngine(_api_key(args.api_key))
+    engine = _engine(args.engine, _api_key(args.api_key, args.engine))
     fetcher = HttpImageFetcher()
 
     with _repository(data_dir) as repository:
@@ -110,17 +127,18 @@ def cmd_scan(args: argparse.Namespace) -> int:
             console.print(
                 f"[yellow]dry-run[/]: would run [bold]{len(plan)}[/] searches on "
                 f"{plan.engine_name}. Estimated cost [bold]${plan.cost}[/] "
-                f"({FREE_UNITS_PER_MONTH} free per month, then ${PRICE_PER_1K}/1000)."
+                f"({engine.free_units_per_month} free per month, "
+                f"then ${engine.price_per_1k}/1000)."
             )
             console.print(
                 f"[dim]that would leave {plan.already_searched + len(plan)} of "
-                f"{indexed.unique} unique photos searched; "
-                f"{plan.spent_this_month} searches billed this month so far.[/]"
+                f"{indexed.unique} searched on {plan.engine_name}; "
+                f"{plan.spent_this_month} billed there this month so far.[/]"
             )
             return 0
 
-        if len(plan) and not _api_key(args.api_key):
-            console.print(API_KEY_HELP)
+        if len(plan) and not _api_key(args.api_key, args.engine):
+            console.print(API_KEY_HELP[args.engine])
             return 2
 
         try:
@@ -131,10 +149,9 @@ def cmd_scan(args: argparse.Namespace) -> int:
                     service.search(plan, platforms, on_batch=lambda n: bar.advance(task, n))
             else:
                 console.print("[dim]Nothing new to search.[/]")
-            searched = repository.counts()
             console.print(
-                f"[bold]{searched.searched}[/] of [bold]{searched.unique}[/] "
-                f"unique photos searched on {plan.engine_name}"
+                f"[bold]{repository.searched_by(engine.name)}[/] of "
+                f"[bold]{indexed.unique}[/] unique photos searched on {plan.engine_name}"
             )
 
             if not args.no_verify:
@@ -151,23 +168,39 @@ def cmd_reparse(args: argparse.Namespace) -> int:
     """Re-read the answers already paid for. The filters may have been wrong; the money
     was still spent, and this is what makes correcting them free."""
     data_dir = Path(args.data_dir)
-    engine = VisionSearchEngine()
     fetcher = HttpImageFetcher()
+    platforms = OWN_PLATFORMS | frozenset(args.ignore_domain or [])
     with _repository(data_dir) as repository:
-        service = ScanService(
-            repository, repository, engine, FileImageLoader(), fetcher, repository
-        )
         try:
-            recovered = service.reparse(OWN_PLATFORMS | frozenset(args.ignore_domain or []))
-            answers = len(repository.all())
-            console.print(
-                f"[bold]{recovered}[/] candidates recovered from {answers} stored answers "
-                f"[dim](no search, no cost)[/]"
-            )
+            seen = 0
+            for name in ("vision", "lens"):
+                engine = _engine(name)
+                stored = len(repository.all(engine.name))
+                seen += stored
+                if not stored:
+                    continue
+                service = ScanService(
+                    repository, repository, engine, FileImageLoader(), fetcher, repository
+                )
+                recovered = service.reparse(platforms)
+                engine.close()
+                console.print(
+                    f"[bold]{recovered}[/] candidates recovered from {stored} "
+                    f"{engine.name} answers [dim](no search, no cost)[/]"
+                )
+            if not seen:
+                console.print("[dim]No archived answers yet — nothing to re-read.[/]")
             if not args.no_verify:
+                service = ScanService(
+                    repository,
+                    repository,
+                    _engine("vision"),
+                    FileImageLoader(),
+                    fetcher,
+                    repository,
+                )
                 _verify(service, repository, args.workers)
         finally:
-            engine.close()
             fetcher.close()
     console.print(f"\nDone. Run [bold]imgtrail --data-dir {data_dir} report[/] for the report.")
     return 0
@@ -205,30 +238,42 @@ def cmd_trace(args: argparse.Namespace) -> int:
         flat = " · [yellow]flat frame, never searched[/]" if photo.fingerprint.is_degenerate else ""
         console.print(f"  {photo.fingerprint} · group {group}{collapsed}{flat}")
 
-        payload = repository.answer_for(group)
-        if payload is None:
+        answers = repository.answers_for(group)
+        if not answers:
             console.print("\n[yellow]No archived answer[/] — not searched, or searched before")
             console.print("[dim]answers were kept. A scan --again would fetch one.[/]")
             return 0
 
-        answer = explain(payload)
-        judged = {(m.page_url, m.image_url): m for m in repository.matches_for(group)}
-        named = list({(m.page_url, m.image_url): m for m in answer.matches}.values())
-        dropped = [m for m in named if (m.page_url, m.image_url) not in judged]
+        named: list[Match] = []
+        for engine_name, payload in answers:
+            console.print(f"\n[bold]{engine_name} answered[/]")
+            if engine_name == VisionSearchEngine.name:
+                told = explain(payload)
+                named += list(told.matches)
+                if told.guess:
+                    console.print(f'  [dim]best guess "{told.guess}"[/]')
+                console.print(f"  {len(told.matches)} candidates with an image to check")
+                if told.unnamed_pages:
+                    console.print(
+                        f"  [dim]{len(told.unnamed_pages)} pages named with no image — dropped, "
+                        f"topical: 9.6% of those claims held[/]"
+                    )
+                if told.similar:
+                    console.print(
+                        f"  [dim]{len(told.similar)} visually similar — dropped, "
+                        f"likeness is not a copy[/]"
+                    )
+            else:
+                matches = _engine(engine_name.removeprefix("google-")).parse(payload).matches
+                named += list(matches)
+                console.print(f"  {len(matches)} candidates with an image to check")
 
-        guess = f' — best guess "{answer.guess}"' if answer.guess else ""
-        console.print(f"\n[bold]the engine answered[/]{guess}")
-        console.print(f"  {len(named)} candidates with an image to check")
-        if answer.unnamed_pages:
-            console.print(
-                f"  [dim]{len(answer.unnamed_pages)} pages named with no image — dropped, "
-                f"topical: 9.6% of those claims held[/]"
-            )
-        if answer.similar:
-            console.print(
-                f"  [dim]{len(answer.similar)} visually similar — dropped, "
-                f"likeness is not a copy[/]"
-            )
+        judged = {(m.page_url, m.image_url): m for m in repository.matches_for(group)}
+        dropped = [
+            m
+            for m in {(m.page_url, m.image_url): m for m in named}.values()
+            if (m.page_url, m.image_url) not in judged
+        ]
 
         if judged:
             console.print("\n[bold]what became of them[/]")
@@ -291,7 +336,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan = sub.add_parser("scan", help="index, dedupe, search and verify")
     scan.add_argument("source", help="Instagram data export (.zip) or a folder of images")
-    scan.add_argument("--api-key", help="Cloud Vision API key")
+    scan.add_argument(
+        "--engine",
+        choices=("vision", "lens"),
+        default="vision",
+        help="which index to search: vision is cheap and wide, lens sees what vision cannot",
+    )
+    scan.add_argument("--api-key", help="API key for the chosen engine")
     scan.add_argument("--limit", type=int, help="search at most N unique photos")
     scan.add_argument(
         "--dry-run",

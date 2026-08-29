@@ -6,6 +6,7 @@ import functools
 import http.server
 import io
 import json
+import sqlite3
 import threading
 import zipfile
 from collections.abc import Iterator
@@ -18,6 +19,8 @@ from PIL import Image
 from imgtrail.adapters.html_report import HtmlReportWriter, JsonReportWriter
 from imgtrail.adapters.http_fetcher import HttpImageFetcher
 from imgtrail.adapters.local_files import FileImageLoader, LocalPhotoSource
+from imgtrail.adapters.serpapi import LensSearchEngine, parse_visual_matches
+from imgtrail.adapters.serpapi import shrink as lens_shrink
 from imgtrail.adapters.sqlite_repository import SqliteRepository
 from imgtrail.adapters.vision import (
     MissingApiKey,
@@ -67,6 +70,44 @@ class TestSqliteRepository:
         repository.add(photo)
 
         assert len(repository.fingerprints()) == 1
+
+    def test_a_second_engine_does_not_overwrite_the_first(
+        self, repository: SqliteRepository
+    ) -> None:
+        """Both tables used to be keyed by photo alone, so Lens would erase Vision."""
+        repository.mark_searched(1, "google-vision")
+        repository.mark_searched(1, "google-lens")
+        repository.save(1, "google-vision", '{"from": "vision"}')
+        repository.save(1, "google-lens", '{"from": "lens"}')
+
+        assert repository.counts().searched == 1, "one photo, searched by two engines"
+        assert repository.searched_this_month("google-lens") == 1
+        assert dict(repository.answers_for(1)) == {
+            "google-lens": '{"from": "lens"}',
+            "google-vision": '{"from": "vision"}',
+        }
+
+    def test_a_database_keyed_the_old_way_is_migrated(self, tmp_path: Path) -> None:
+        database = tmp_path / "old.db"
+        old = sqlite3.connect(database)
+        old.executescript(
+            """CREATE TABLE searches (group_id INTEGER PRIMARY KEY, engine TEXT NOT NULL,
+                                     done_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+               CREATE TABLE responses (group_id INTEGER PRIMARY KEY, engine TEXT NOT NULL,
+                                       payload TEXT NOT NULL);
+               INSERT INTO searches(group_id, engine) VALUES (7, 'google-vision');
+               INSERT INTO responses VALUES (7, 'google-vision', '{"kept": true}');"""
+        )
+        old.commit()
+        old.close()
+
+        with SqliteRepository(database) as migrated:
+            migrated.save(7, "google-lens", '{"new": true}')
+
+            assert migrated.answers_for(7) == [
+                ("google-lens", '{"new": true}'),
+                ("google-vision", '{"kept": true}'),
+            ]
 
     def test_an_older_months_searches_are_not_charged_to_this_one(
         self, repository: SqliteRepository
@@ -296,6 +337,50 @@ class TestHttpFetcher:
             assert honest.fetch(f"{base}/photo.png") is None, "no crawler agent, no picture"
         with HttpImageFetcher(crawler_hosts={"127.0.0.1": "facebookexternalhit/1.1"}) as knocking:
             assert knocking.fetch(f"{base}/photo.png") == image_bytes(1)
+
+
+class TestSerpApiAdapter:
+    RESPONSE = {
+        "visual_matches": [
+            {
+                "title": "Medieval castle in Puebla de Almenara, Spain",
+                "link": "https://www.facebook.com/groups/703828331595169/posts/1262367775741219/",
+                "source": "Facebook",
+                "thumbnail": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcQLLnuP",
+                "image": "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1193912",
+            },
+            {"title": "No image on this one", "link": "https://example.com/p", "thumbnail": "x"},
+        ]
+    }
+
+    def test_the_source_image_is_kept_not_googles_thumbnail(self) -> None:
+        """Reading `thumbnail` instead of `image` once "found" five copies on gstatic.com."""
+        [match] = parse_visual_matches(self.RESPONSE)
+
+        assert match.image_url.startswith("https://lookaside.fbsbx.com/")
+        assert (
+            match.page_url
+            == "https://www.facebook.com/groups/703828331595169/posts/1262367775741219/"
+        )
+        assert match.kind is MatchKind.PARTIAL, "Lens never says it matched the whole frame"
+
+    def test_an_entry_with_no_image_is_not_a_match(self) -> None:
+        assert len(parse_visual_matches(self.RESPONSE)) == 1
+
+    def test_an_answer_reads_back_from_its_own_payload(self) -> None:
+        engine = LensSearchEngine()
+        answer = engine.parse(json.dumps(self.RESPONSE))
+
+        assert engine.parse(answer.payload) == answer
+
+    def test_an_upload_that_is_too_big_is_shrunk(self) -> None:
+        assert len(lens_shrink(image_bytes(1, size=(4000, 4000)), limit=40_000)) <= 40_000
+
+    def test_the_free_tier_is_taken_into_account(self) -> None:
+        assert LensSearchEngine().estimated_cost(100) == 0.0
+        assert LensSearchEngine().estimated_cost(1000, already_used=250) == round(
+            1000 * 15 / 1000, 2
+        )
 
 
 class TestLocalFiles:
