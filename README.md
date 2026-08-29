@@ -25,15 +25,24 @@ imgtrail report --open
 Reverse image search is not one thing. Cloud Vision's `WEB_DETECTION` and the Google Lens you
 get by dragging a photo into the search box are different indexes, and they disagree.
 
-Measured on one photograph — a drone shot of a castle:
+Forty-seven photographs put through both, and judged the same way — downloaded and compared
+against the original:
 
 | | Vision | Lens |
 |---|---|---|
-| Verified copies found | 19, across nine Facebook pages | 5 |
-| Pinterest | never mentions it, in any field | 3 boards, verified |
-| Cost | $3.50 / 1,000, first 1,000 free monthly | subscription, 250 free monthly |
+| Verified copies the other engine missed | 0 | **9** |
+| Cost | $3.50 / 1,000, first 1,000 free monthly | ~$15 / 1,000, first 250 free monthly |
 
-Neither is a superset of the other. So both are here:
+On those forty-seven Vision found nothing at all. What Lens turned up was on Walmart, Etsy,
+two clothing shops, a veterinary practice — places a photograph drifts to that Vision's index
+does not reach.
+
+One photograph tells the same story from the other side. A drone shot of a castle: Vision
+found it on nine Facebook pages and never mentioned Pinterest in any field of its answer;
+Lens found three Pinterest boards, and a Facebook group Vision had missed.
+
+Neither is more accurate — five of fifty-nine Lens candidates survived verification, which is
+Vision's hit rate too. They simply look in different places, so both are here:
 
 ```
 imgtrail scan EXPORT                    # vision: cheap and wide, the default
@@ -55,9 +64,10 @@ something has already been found on.
 
 ## What it finds, and what it doesn't
 
-It searches Google's index, so it finds your photos on **blogs, news sites, Pinterest, Tumblr,
-forums, scraper mirrors and shops that lifted your pictures** — and on **public Facebook posts
-and groups**, which is where a photograph of somewhere recognisable tends to end up.
+It finds your photos on **blogs, news sites, forums, marketplaces, scraper mirrors and shops
+that lifted your pictures**, and on **public Facebook posts and groups**, which is where a
+photograph of somewhere recognisable tends to end up. **Pinterest** comes back from Lens and
+never from Vision, which is most of the argument for running both.
 
 It will **not** find a repost on another Instagram account. Instagram blocks crawling of post
 images, so they aren't in anyone's index — the only way such a repost surfaces here is
@@ -163,9 +173,14 @@ calling anything, so correcting a filter costs nothing.
 
 ## Privacy
 
-Your photos are sent to Google Cloud Vision, and nowhere else. Nothing is uploaded to any
-server of mine — there isn't one. The database, the extracted export and the report all stay
-on your machine.
+Your photos are sent to whichever engine you run: Google Cloud Vision by default, and SerpApi
+as well if you pass `--engine lens`. Both receive the picture itself. Lens photos are uploaded
+rather than linked — a tool for finding where your pictures leaked has no business publishing
+them to a public URL first — and the upload is temporary.
+
+Nothing is uploaded to any server of mine; there isn't one. The database, the extracted export
+and the report all stay on your machine, and no photograph is ever sent anywhere without a
+search you asked for and priced first with `--dry-run`.
 
 ## Architecture
 
@@ -176,20 +191,22 @@ about Google, SQLite or HTTP, so swapping a search backend touches exactly one f
 domain.py     fingerprints, grouping, verdicts, what counts as "your own platform"
               — pure; no I/O, no SQL, no network
 ports.py      the boundaries: PhotoSource, ImageLoader, SearchEngine, ImageFetcher,
-              PhotoRepository, MatchRepository, ReportWriter
-services.py   the use cases: index, plan, search, verify, report
-adapters/     the details: sqlite_repository, vision, http_fetcher, local_files, html_report
+              PhotoRepository, MatchRepository, ResponseArchive, ReportWriter
+services.py   the use cases: index, plan, search, verify, reparse, report
+adapters/     the details: sqlite_repository, vision, serpapi, http_fetcher,
+              local_files, html_report
 cli.py        the composition root — the one module that knows every layer
 ```
 
-Adding TinEye or Yandex means writing one `SearchEngine` and wiring it in `cli.py`. Nothing
-in `domain.py` or `services.py` changes.
+Adding a third engine means writing one `SearchEngine` and wiring it in `cli.py`. That is not
+a claim, it is what happened: Lens arrived as `adapters/serpapi.py` without a line of
+`domain.py` changing.
 
 ## Development
 
 ```bash
 uv sync --all-groups
-uv run pytest             # 85 tests, no network, no mocks
+uv run pytest             # 130 tests, no network, no mocks
 uv run ruff check .
 uv run ruff format .
 uv run mypy               # strict, and it passes on the tests too
@@ -197,7 +214,7 @@ uv run mypy               # strict, and it passes on the tests too
 
 The test doubles are real implementations, not mocks: an in-memory `DictPhotoSource`, a
 `FakeSearchEngine` that records what it was asked, and — where the wire itself is what needs
-testing — a real local HTTP server speaking Vision's JSON.
+testing — a real local HTTP server speaking Vision's and SerpApi's JSON.
 
 ## Licence
 
