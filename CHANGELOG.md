@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/Endika/imgtrail/compare/v0.2.0...v0.3.0) (2026-08-29)
+
+
+### Features
+
+* fold the report so it opens as an index, not a scroll ([6231a58](https://github.com/Endika/imgtrail/commit/6231a588049a989b9a914f18645dcd24afbf071e))
+
 ## [0.2.0](https://github.com/Endika/imgtrail/compare/v0.1.2...v0.2.0) (2026-08-29)
 
 
