@@ -20,68 +20,25 @@ imgtrail scan ~/Downloads/instagram-export.zip
 imgtrail report --open
 ```
 
-## Two engines, because one index is not the web
-
-Reverse image search is not one thing. Cloud Vision's `WEB_DETECTION` and the Google Lens you
-get by dragging a photo into the search box are different indexes, and they disagree.
-
-Forty-seven photographs put through both, and judged the same way — downloaded and compared
-against the original:
-
-| | Vision | Lens |
-|---|---|---|
-| Verified copies the other engine missed | 0 | **9** |
-| Cost | $3.50 / 1,000, first 1,000 free monthly | ~$15 / 1,000, first 250 free monthly |
-
-On those forty-seven Vision found nothing at all. What Lens turned up was on Walmart, Etsy,
-two clothing shops, a veterinary practice — places a photograph drifts to that Vision's index
-does not reach.
-
-One photograph tells the same story from the other side. A drone shot of a castle: Vision
-found it on nine Facebook pages and never mentioned Pinterest in any field of its answer;
-Lens found three Pinterest boards, and a Facebook group Vision had missed.
-
-Neither is more accurate — five of fifty-nine Lens candidates survived verification, which is
-Vision's hit rate too. They simply look in different places, so both are here:
-
-```
-imgtrail scan EXPORT                    # vision: cheap and wide, the default
-imgtrail scan EXPORT --engine lens      # lens: a different index, for the photos you care about
-```
-
-A photo already searched by one engine is still new to the other, so `--engine lens --limit 20`
-spends twenty searches on the twenty you have not covered yet. Results from both land in the
-same report and are verified the same way.
-
-Lens costs four times what Vision does, so spend it where the cheap engine came back empty:
-
-```
-imgtrail scan EXPORT --engine lens --only-blank --limit 200
-```
-
-Two hundred a month fits inside the free plan, and `--only-blank` keeps them off the photos
-something has already been found on.
-
 ## What it finds, and what it doesn't
 
 It finds your photos on **blogs, news sites, forums, marketplaces, scraper mirrors and shops
 that lifted your pictures**, and on **public Facebook posts and groups**, which is where a
-photograph of somewhere recognisable tends to end up. **Pinterest** comes back from Lens and
-never from Vision, which is most of the argument for running both.
+photograph of somewhere recognisable tends to end up.
 
-It will **not** find a repost on another Instagram account. Instagram blocks crawling of post
-images, so they aren't in anyone's index — the only way such a repost surfaces here is
-indirectly, via one of the many "Instagram viewer" mirror sites that *are* indexed. Telegram,
-WhatsApp, TikTok and private accounts are invisible to it too. If your question is "is someone
-reposting me inside Instagram", this is the wrong tool and there isn't a good one.
+It will **not** find a repost on another Instagram account. Instagram serves its images to
+nobody — every candidate it offers is a login wall — so a copy there can never be checked
+against your original, and an unverifiable claim is not a finding. Telegram, WhatsApp and
+private accounts are invisible to it too. If your question is "is someone reposting me inside
+Instagram", this is the wrong tool and there isn't a good one.
 
-What it cannot prove, it says so. A candidate the search named and the site would not serve
-— TikTok, Facebook's lookaside — is listed apart under **"found, but not verified"**: a place
-to go and look, not a claim. Pages named with no image at all are not kept: of the page-level
-claims that could be checked against the original, 9.6% held.
+What it cannot prove, it says so. A candidate the search named and the site would not serve —
+TikTok, Facebook's lookaside — is listed apart under **"found, but not verified"**: a place to
+go and look, not a claim. Pages named with no image at all are dropped: measured against the
+page-level claims that could be checked, 9.6% held.
 
-Your own Facebook page is not filtered out: from a group post there is no telling whose it is.
-If you cross-post everything from Instagram, `--ignore-domain facebook.com`.
+Your own Facebook page is not filtered out — from a group post there is no telling whose it
+is. If you cross-post everything from Instagram, `--ignore-domain facebook.com`.
 
 ## Install
 
@@ -99,7 +56,7 @@ A plain folder of images works just as well.
 
 ## Getting an API key
 
-**Vision**, the default. Create a project at
+**Vision** is the default and the only one you need. Create a project at
 [console.cloud.google.com](https://console.cloud.google.com), enable the **Cloud Vision API**,
 then Credentials → Create credentials → API key.
 
@@ -107,22 +64,54 @@ then Credentials → Create credentials → API key.
 export IMGTRAIL_API_KEY=AIza...
 ```
 
-**The first 1,000 images each month are free**, then $3.50 per 1,000. A typical profile costs
-nothing.
-
-**Lens**, optional, through [SerpApi](https://serpapi.com/manage-api-key).
+**Lens** is optional, through [SerpApi](https://serpapi.com/manage-api-key).
 
 ```
 export SERPAPI_KEY=...
 ```
 
-250 searches a month on the free plan, which is enough for the way it is meant to be used:
-a second opinion on the photos you care about, not a second pass over everything. Beyond that
-it is a subscription, around $15 per 1,000 — four times Vision. Your photos are uploaded, never
-published to a URL.
+| | Vision | Lens |
+|---|---|---|
+| Free each month | 1,000 searches | 250 searches |
+| After that | $3.50 per 1,000 | about $15 per 1,000 |
 
-Run `--dry-run` first with either one and it will tell you exactly how many searches it would
-make and what they would cost before spending anything.
+A typical profile costs nothing on Vision. Lens is four times the price, and the free 250 a
+month are enough for the way it earns its keep — see below.
+
+Run `--dry-run` with either and it will tell you exactly how many searches it would make and
+what they would cost before spending anything. It prices against what that engine has already
+billed *this calendar month*, because that is when the free tier resets.
+
+## Two engines, and when to pay for the second
+
+Reverse image search is not one thing. Cloud Vision's `WEB_DETECTION` and the Google Lens you
+get by dragging a photo into the search box are different indexes, and they disagree.
+
+Forty-seven photographs put through both, judged the same way — downloaded and compared
+against the original:
+
+| | Vision | Lens |
+|---|---|---|
+| Verified copies the other engine missed | 0 | **9** |
+
+On those forty-seven Vision found nothing at all. What Lens turned up was on Walmart, Etsy,
+two clothing shops and a veterinary practice — places a photograph drifts to that Vision's
+index does not reach. Pinterest is the clearest case: it comes back from Lens and never from
+Vision, in any field of its answer.
+
+Neither is more accurate. Five of fifty-nine Lens candidates survived verification, which is
+Vision's hit rate too. They simply look in different places.
+
+So run Vision over everything, and spend Lens where the cheap engine came back empty:
+
+```
+imgtrail scan EXPORT --engine lens --only-blank --limit 200
+```
+
+A photo searched by one engine is still new to the other, so that spends two hundred searches
+on two hundred uncovered photos, inside the free plan, and `--only-blank` keeps them off the
+photos something has already been found on. Results from both land in the same report and are
+verified the same way.
 
 ## How the verification works
 
@@ -138,9 +127,16 @@ image and compares perceptual hashes against your original:
 Only `confirmed` and `likely` reach the report. `visuallySimilarImages` is dropped entirely —
 it means "semantically alike", not "this is your photo", and it drowns the report in noise.
 
+A photo with nothing in it is never searched. A blank frame has no fingerprint worth the name:
+it sits at distance zero from every other blank frame on the internet, and one of them once
+put 118 false `confirmed` in a report.
+
 ## Commands
 
 ```
+imgtrail --data-dir DIR CMD   where the database lives (default ./imgtrail-data)
+                              — note it goes before the command, not after
+
 imgtrail scan SOURCE          index, dedupe, search and verify — resumable
   --engine vision|lens        which index to search (default vision)
   --only-blank                only photos nothing has been found on yet
@@ -150,26 +146,28 @@ imgtrail scan SOURCE          index, dedupe, search and verify — resumable
   --ignore-domain DOMAIN      exclude a domain from results (repeatable)
   --again                     search everything again, paying for it again
   --no-verify                 skip the download-and-compare pass
+  --workers N                 parallel downloads while verifying (default 8)
 imgtrail reparse              re-read the stored answers under today's filters
   --ignore-domain DOMAIN      exclude a domain from results (repeatable)
-imgtrail trace PHOTO          everything the engine said about one photo, and its fate
+  --no-verify                 skip the download-and-compare pass
+  --workers N                 parallel downloads while verifying (default 8)
+imgtrail trace PHOTO          everything the engines said about one photo, and its fate
 imgtrail report --open        build the HTML report and open it
+  --json FILE                 also write the findings as JSON
 imgtrail status               what's in the database so far
 ```
 
-State lives in `./imgtrail-data`. Everything is idempotent: re-running `scan` searches only
-what it hasn't searched before, so an interrupted run costs nothing to resume. A scan stays
-inside the source you point it at — the database may hold other folders, and they are not
-what you asked to search.
+Everything is idempotent: re-running `scan` searches only what it hasn't searched before, so
+an interrupted run costs nothing to resume. A scan stays inside the source you point it at —
+the database may hold other folders, and they are not what you asked to search.
 
-`trace` answers "why is my photo not in the report" without reading the source: it prints
-what the engine said about that one photo and what each filter did with it. It reads the
-archive, so it costs nothing.
+`trace` answers "why is my photo not in the report" without reading the source: it prints what
+each engine said about that one photo and what every filter did with it.
 
-Every answer a search engine gives is kept verbatim. Filtering is a pile of judgement calls —
+Every answer an engine gives is kept, word for word. Filtering is a pile of judgement calls —
 which platforms are yours, which candidates are worth downloading — and at least one of them
-is wrong. `reparse` re-reads what you already paid for under the current rules, without
-calling anything, so correcting a filter costs nothing.
+is wrong. `reparse` re-reads what you already paid for under today's rules, calling nothing,
+so correcting a filter costs nothing. Both of those read the archive, so both are free.
 
 ## Privacy
 
@@ -178,14 +176,14 @@ as well if you pass `--engine lens`. Both receive the picture itself. Lens photo
 rather than linked — a tool for finding where your pictures leaked has no business publishing
 them to a public URL first — and the upload is temporary.
 
-Nothing is uploaded to any server of mine; there isn't one. The database, the extracted export
-and the report all stay on your machine, and no photograph is ever sent anywhere without a
-search you asked for and priced first with `--dry-run`.
+Nothing goes to any server of mine; there isn't one. The database, the extracted export and
+the report all stay on your machine, and no photograph is sent anywhere without a search you
+asked for and could have priced first with `--dry-run`.
 
 ## Architecture
 
-Ports and adapters, sized to the problem: the rules sit in the middle and know nothing
-about Google, SQLite or HTTP, so swapping a search backend touches exactly one file.
+Ports and adapters, sized to the problem: the rules sit in the middle and know nothing about
+Google, SQLite or HTTP.
 
 ```
 domain.py     fingerprints, grouping, verdicts, what counts as "your own platform"
