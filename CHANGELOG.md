@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/Endika/imgtrail/compare/v0.3.0...v0.4.0) (2026-08-29)
+
+
+### Features
+
+* search Google Lens as a second engine, since one index is not the web ([0d67318](https://github.com/Endika/imgtrail/commit/0d673181b0d05145302e8e05a2f95fd8d7ae15af))
+
 ## [0.3.0](https://github.com/Endika/imgtrail/compare/v0.2.0...v0.3.0) (2026-08-29)
 
 
