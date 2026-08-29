@@ -231,6 +231,25 @@ class TestLocalFiles:
 
         assert [Path(p).parent.name for p in found] == ["posts"]
 
+    def test_a_source_folder_named_like_a_skipped_one_is_still_read(self, tmp_path: Path) -> None:
+        # Only folders *inside* the export are skipped; the path you point at is your choice.
+        source = tmp_path / "profile"
+        source.mkdir()
+        (source / "x.png").write_bytes(image_bytes(1))
+
+        assert len(list(LocalPhotoSource(source, tmp_path / "work").photos())) == 1
+
+    def test_the_other_folder_is_your_own_photography(self, tmp_path: Path) -> None:
+        # A real export puts the bulk of your pictures under media/other, not media/posts.
+        export = tmp_path / "export" / "media"
+        for folder in ("posts", "other"):
+            (export / folder).mkdir(parents=True)
+            (export / folder / "x.png").write_bytes(image_bytes(1))
+
+        found = list(LocalPhotoSource(tmp_path / "export", tmp_path / "work").photos())
+
+        assert sorted(Path(p).parent.name for p in found) == ["other", "posts"]
+
     def test_a_zip_export_is_unpacked_once(self, tmp_path: Path) -> None:
         archive = tmp_path / "export.zip"
         with zipfile.ZipFile(archive, "w") as zf:

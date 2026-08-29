@@ -8,8 +8,11 @@ from pathlib import Path
 
 EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp"})
 
-SKIP_DIRECTORIES = frozenset({"profile", "other", "messages", "stories_activity", "avatars"})
-"""The export ships avatars and other people's content next to your own posts."""
+SKIP_DIRECTORIES = frozenset({"profile", "messages", "stories_activity", "avatars"})
+"""The export ships avatars and conversations next to your own pictures.
+
+`media/other` is not one of them: despite the name it holds the bulk of your own
+photography — in a real export, 845 pictures against 74 under `media/posts`."""
 
 
 class FileImageLoader:
@@ -29,9 +32,9 @@ class LocalPhotoSource(FileImageLoader):
     def photos(self) -> Iterator[str]:
         root = self._unpacked()
         for path in sorted(root.rglob("*")):
-            if path.suffix.lower() not in EXTENSIONS:
+            if not path.is_file() or path.suffix.lower() not in EXTENSIONS:
                 continue
-            if SKIP_DIRECTORIES & {part.lower() for part in path.parts}:
+            if SKIP_DIRECTORIES & {part.lower() for part in path.relative_to(root).parts}:
                 continue
             yield str(path.resolve())
 
