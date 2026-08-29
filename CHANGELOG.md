@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/Endika/imgtrail/compare/v0.4.0...v0.4.1) (2026-08-29)
+
+
+### Bug Fixes
+
+* never let one unrequestable url end a verification run ([a1cdc53](https://github.com/Endika/imgtrail/commit/a1cdc539b37a7e3eb1095b013a0871f2b48af6fe))
+
 ## [0.4.0](https://github.com/Endika/imgtrail/compare/v0.3.0...v0.4.0) (2026-08-29)
 
 
