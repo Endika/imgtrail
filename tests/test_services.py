@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from imgtrail.adapters.sqlite_repository import SqliteRepository
 from imgtrail.domain import Match, MatchKind, Verdict
-from imgtrail.services import ReportService, ScanService
+from imgtrail.services import ReportService, ScanPlan, ScanService
 
-from .conftest import DictImageFetcher, DictPhotoSource, FakeSearchEngine, image_bytes
+from .conftest import (
+    DictImageFetcher,
+    DictPhotoSource,
+    FakeSearchEngine,
+    flat_bytes,
+    image_bytes,
+)
 
 
 def build(
@@ -82,6 +88,17 @@ class TestPlanning:
         service.index(album)
 
         assert len(service.plan(limit=2)) == 2
+
+    def test_a_flat_frame_is_never_worth_searching(self, repository: SqliteRepository) -> None:
+        """It matches every other flat frame online, so the money buys 118 false positives."""
+        album = DictPhotoSource({"/album/black.png": flat_bytes(), "/album/b.png": image_bytes(9)})
+        service, _, _ = build(repository, album)
+        service.index(album)
+
+        plan = service.plan()
+
+        assert [p.path for p in plan.pending] == ["/album/b.png"]
+        assert plan.flat == 1
 
     def test_planning_calls_no_engine(
         self, repository: SqliteRepository, album: DictPhotoSource
@@ -287,6 +304,27 @@ class TestReporting:
 
         domains = {m.domain for f in report.findings for m in f.matches}
         assert domains == {"good.example.com"}
+
+    def test_a_flat_frame_reports_nothing_however_it_was_matched(
+        self, repository: SqliteRepository
+    ) -> None:
+        """Rows searched before the fix are still in the database, and stay out anyway."""
+        album = DictPhotoSource({"/album/black.png": flat_bytes()})
+        engine = FakeSearchEngine([[blog()]])
+        fetcher = DictImageFetcher({"https://blog.example.com/i.jpg": flat_bytes()})
+        service, _, _ = build(repository, album, engine, fetcher)
+        service.index(album)
+        service.search(
+            ScanPlan(
+                pending=tuple(repository.representatives_awaiting_search()),
+                already_searched=0,
+                engine_name="fake",
+                cost=0.0,
+            )
+        )
+        service.verify(workers=1)
+
+        assert ReportService(repository, repository).build().findings == ()
 
     def test_a_finding_knows_how_many_copies_you_posted(
         self, repository: SqliteRepository, album: DictPhotoSource
