@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/Endika/imgtrail/compare/v0.4.1...v0.5.0) (2026-08-29)
+
+
+### Features
+
+* spend the expensive engine only where the cheap one came back empty ([5b85ca2](https://github.com/Endika/imgtrail/commit/5b85ca2da0b1a8e2ac17072318a107bcdc473af8))
+
 ## [0.4.1](https://github.com/Endika/imgtrail/compare/v0.4.0...v0.4.1) (2026-08-29)
 
 
