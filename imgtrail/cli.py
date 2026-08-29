@@ -116,7 +116,9 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"([dim]{indexed.duplicates_saved} duplicate searches saved[/])"
         )
 
-        plan = service.plan(args.limit, again=args.again, under=source.prefix)
+        plan = service.plan(
+            args.limit, again=args.again, under=source.prefix, only_blank=args.only_blank
+        )
         if plan.flat:
             left_out = "photo" if plan.flat == 1 else "photos"
             console.print(
@@ -360,6 +362,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         metavar="DOMAIN",
         help="extra domain to exclude from results (repeatable)",
+    )
+    scan.add_argument(
+        "--only-blank",
+        action="store_true",
+        help="search only photos nothing has been found on yet — where a second engine pays",
     )
     scan.add_argument(
         "--again",

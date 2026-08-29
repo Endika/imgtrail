@@ -44,6 +44,15 @@ A photo already searched by one engine is still new to the other, so `--engine l
 spends twenty searches on the twenty you have not covered yet. Results from both land in the
 same report and are verified the same way.
 
+Lens costs four times what Vision does, so spend it where the cheap engine came back empty:
+
+```
+imgtrail scan EXPORT --engine lens --only-blank --limit 200
+```
+
+Two hundred a month fits inside the free plan, and `--only-blank` keeps them off the photos
+something has already been found on.
+
 ## What it finds, and what it doesn't
 
 It searches Google's index, so it finds your photos on **blogs, news sites, Pinterest, Tumblr,
@@ -124,6 +133,7 @@ it means "semantically alike", not "this is your photo", and it drowns the repor
 ```
 imgtrail scan SOURCE          index, dedupe, search and verify — resumable
   --engine vision|lens        which index to search (default vision)
+  --only-blank                only photos nothing has been found on yet
   --dry-run                   count the searches and their cost, call nothing
   --limit N                   search at most N unique photos
   --threshold N               pHash distance for "same photo" (default 6)

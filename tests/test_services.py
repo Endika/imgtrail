@@ -111,6 +111,23 @@ class TestPlanning:
         assert [p.path for p in service.plan(under="/other/").pending] == ["/other/x.png"]
         assert len(service.plan()) == 2, "unscoped, it still covers everything"
 
+    def test_only_blank_leaves_out_the_photos_already_found_somewhere(
+        self, repository: SqliteRepository, album: DictPhotoSource
+    ) -> None:
+        """A second engine costs four times the first; blanks are where it can pay."""
+        engine = FakeSearchEngine([[blog()]])
+        fetcher = DictImageFetcher({"https://blog.example.com/i.jpg": album.images["/album/a.png"]})
+        service, _, _ = build(repository, album, engine, fetcher)
+        service.index(album)
+        service.search(service.plan())
+        service.verify(workers=1)
+        assert repository.tally().get(Verdict.CONFIRMED) == 1
+
+        blank = service.plan(again=True, only_blank=True)
+
+        assert len(blank) == 2, "the two nothing was found on"
+        assert all("/album/a.png" not in p.path for p in blank.pending)
+
     def test_again_plans_the_photos_already_paid_for(
         self, repository: SqliteRepository, album: DictPhotoSource
     ) -> None:
