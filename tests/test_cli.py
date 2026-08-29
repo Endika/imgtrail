@@ -93,8 +93,8 @@ class TestScan:
         run(tmp_path, "scan", str(album_dir), "--dry-run")
 
         out = capsys.readouterr().out.replace("\n", " ")
-        assert "would leave 2 of 2 unique photos searched" in out
-        assert "0 searches billed this month" in out
+        assert "would leave 2 of 2 searched on google-vision" in out
+        assert "0 billed there this month" in out
 
     def test_pointing_at_a_second_folder_does_not_replan_the_first(
         self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -129,7 +129,7 @@ class TestReparse:
         capsys.readouterr()
 
         assert run(tmp_path, "reparse") == 0
-        assert "0 stored answers" in capsys.readouterr().out.replace("\n", " ")
+        assert "nothing to re-read" in capsys.readouterr().out.replace("\n", " ")
 
 
 class TestTrace:

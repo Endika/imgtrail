@@ -114,6 +114,8 @@ class MissingApiKey(RuntimeError):
 class VisionSearchEngine:
     name = "google-vision"
     batch_size = 16  # Vision's per-request cap
+    free_units_per_month = FREE_UNITS_PER_MONTH
+    price_per_1k = PRICE_PER_1K
 
     def __init__(
         self,

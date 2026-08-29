@@ -20,6 +20,30 @@ imgtrail scan ~/Downloads/instagram-export.zip
 imgtrail report --open
 ```
 
+## Two engines, because one index is not the web
+
+Reverse image search is not one thing. Cloud Vision's `WEB_DETECTION` and the Google Lens you
+get by dragging a photo into the search box are different indexes, and they disagree.
+
+Measured on one photograph — a drone shot of a castle:
+
+| | Vision | Lens |
+|---|---|---|
+| Verified copies found | 19, across nine Facebook pages | 5 |
+| Pinterest | never mentions it, in any field | 3 boards, verified |
+| Cost | $3.50 / 1,000, first 1,000 free monthly | subscription, 250 free monthly |
+
+Neither is a superset of the other. So both are here:
+
+```
+imgtrail scan EXPORT                    # vision: cheap and wide, the default
+imgtrail scan EXPORT --engine lens      # lens: a different index, for the photos you care about
+```
+
+A photo already searched by one engine is still new to the other, so `--engine lens --limit 20`
+spends twenty searches on the twenty you have not covered yet. Results from both land in the
+same report and are verified the same way.
+
 ## What it finds, and what it doesn't
 
 It searches Google's index, so it finds your photos on **blogs, news sites, Pinterest, Tumblr,
@@ -56,7 +80,7 @@ A plain folder of images works just as well.
 
 ## Getting an API key
 
-imgtrail uses Google Cloud Vision's `WEB_DETECTION`. Create a project at
+**Vision**, the default. Create a project at
 [console.cloud.google.com](https://console.cloud.google.com), enable the **Cloud Vision API**,
 then Credentials → Create credentials → API key.
 
@@ -65,8 +89,21 @@ export IMGTRAIL_API_KEY=AIza...
 ```
 
 **The first 1,000 images each month are free**, then $3.50 per 1,000. A typical profile costs
-nothing. Run `--dry-run` first and it will tell you exactly how many searches it would make and
-what they would cost before spending anything.
+nothing.
+
+**Lens**, optional, through [SerpApi](https://serpapi.com/manage-api-key).
+
+```
+export SERPAPI_KEY=...
+```
+
+250 searches a month on the free plan, which is enough for the way it is meant to be used:
+a second opinion on the photos you care about, not a second pass over everything. Beyond that
+it is a subscription, around $15 per 1,000 — four times Vision. Your photos are uploaded, never
+published to a URL.
+
+Run `--dry-run` first with either one and it will tell you exactly how many searches it would
+make and what they would cost before spending anything.
 
 ## How the verification works
 
@@ -86,6 +123,7 @@ it means "semantically alike", not "this is your photo", and it drowns the repor
 
 ```
 imgtrail scan SOURCE          index, dedupe, search and verify — resumable
+  --engine vision|lens        which index to search (default vision)
   --dry-run                   count the searches and their cost, call nothing
   --limit N                   search at most N unique photos
   --threshold N               pHash distance for "same photo" (default 6)
