@@ -37,7 +37,8 @@ def parse_web_detection(web: dict[str, Any]) -> list[Match]:
     """Flatten one Vision response into matches.
 
     `pagesWithMatchingImages` is the useful part: it pairs a page with the image on it.
-    Top-level `fullMatchingImages` catches hosted copies Google never tied to a page.
+    The top-level lists catch hosted copies Google never tied to a page — partial ones
+    included, since a repost is usually a crop.
 
     Two kinds of entry are dropped on purpose. `visuallySimilarImages` means "looks
     alike", not "is your photo". And pages Vision lists without naming an image on
@@ -62,6 +63,9 @@ def parse_web_detection(web: dict[str, Any]) -> list[Match]:
 
     for image in web.get("fullMatchingImages", []):
         push(MatchKind.FULL, None, image.get("url"), None)
+
+    for image in web.get("partialMatchingImages", []):
+        push(MatchKind.PARTIAL, None, image.get("url"), None)
 
     return matches
 
