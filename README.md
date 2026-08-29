@@ -94,6 +94,7 @@ imgtrail scan SOURCE          index, dedupe, search and verify — resumable
   --no-verify                 skip the download-and-compare pass
 imgtrail reparse              re-read the stored answers under today's filters
   --ignore-domain DOMAIN      exclude a domain from results (repeatable)
+imgtrail trace PHOTO          everything the engine said about one photo, and its fate
 imgtrail report --open        build the HTML report and open it
 imgtrail status               what's in the database so far
 ```
@@ -102,6 +103,10 @@ State lives in `./imgtrail-data`. Everything is idempotent: re-running `scan` se
 what it hasn't searched before, so an interrupted run costs nothing to resume. A scan stays
 inside the source you point it at — the database may hold other folders, and they are not
 what you asked to search.
+
+`trace` answers "why is my photo not in the report" without reading the source: it prints
+what the engine said about that one photo and what each filter did with it. It reads the
+archive, so it costs nothing.
 
 Every answer a search engine gives is kept verbatim. Filtering is a pile of judgement calls —
 which platforms are yours, which candidates are worth downloading — and at least one of them

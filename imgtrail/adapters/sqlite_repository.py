@@ -155,6 +155,21 @@ class SqliteRepository:
             )
         ]
 
+    def matching(self, fragment: str) -> list[Photo]:
+        """Photos whose path contains a fragment — how a person names one on a command line."""
+        return [
+            Photo(
+                id=row["id"],
+                path=row["path"],
+                fingerprint=Fingerprint(row["phash"]),
+                group_id=row["group_id"],
+            )
+            for row in self._conn.execute(
+                "SELECT id, path, phash, group_id FROM photos WHERE path LIKE ? ORDER BY id",
+                (f"%{fragment}%",),
+            )
+        ]
+
     def searched_this_month(self) -> int:
         """The free tier resets with the calendar month, so the all-time count misprices a run."""
         row = self._conn.execute(
@@ -215,6 +230,12 @@ class SqliteRepository:
         )
         self._conn.commit()
 
+    def answer_for(self, group_id: int) -> str | None:
+        row = self._conn.execute(
+            "SELECT payload FROM responses WHERE group_id = ?", (group_id,)
+        ).fetchone()
+        return str(row["payload"]) if row else None
+
     def all(self) -> list[tuple[int, str]]:
         return [
             (row["group_id"], row["payload"])
@@ -247,6 +268,14 @@ class SqliteRepository:
                 """SELECT group_id, page_url, image_url, title FROM matches
                    WHERE verdict = ? ORDER BY group_id""",
                 (Verdict.UNREACHABLE.value,),
+            )
+        ]
+
+    def matches_for(self, group_id: int) -> list[Match]:
+        return [
+            _to_match(row)
+            for row in self._conn.execute(
+                "SELECT * FROM matches WHERE group_id = ? ORDER BY verdict, id", (group_id,)
             )
         ]
 

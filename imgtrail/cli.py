@@ -18,7 +18,7 @@ from .adapters.html_report import HtmlReportWriter, JsonReportWriter
 from .adapters.http_fetcher import HttpImageFetcher
 from .adapters.local_files import FileImageLoader, LocalPhotoSource
 from .adapters.sqlite_repository import SqliteRepository
-from .adapters.vision import FREE_UNITS_PER_MONTH, PRICE_PER_1K, VisionSearchEngine
+from .adapters.vision import FREE_UNITS_PER_MONTH, PRICE_PER_1K, VisionSearchEngine, explain
 from .domain import OWN_PLATFORMS, Verdict
 from .services import IndexResult, ReportService, ScanService
 
@@ -173,6 +173,84 @@ def cmd_reparse(args: argparse.Namespace) -> int:
     return 0
 
 
+def _short(url: str, width: int = 62) -> str:
+    """A terminal is 80 columns and the scheme is never the interesting part."""
+    bare = url.removeprefix("https://").removeprefix("http://")
+    return bare if len(bare) <= width else f"{bare[: width - 1]}…"
+
+
+def cmd_trace(args: argparse.Namespace) -> int:
+    """Everything the engine said about one photo, and what became of each part of it.
+
+    The report is a filtered opinion. This is the record behind it, so "why is my photo
+    not in there" stops being a question you answer by reading the source."""
+    with _repository(Path(args.data_dir)) as repository:
+        found = repository.matching(args.photo)
+        if not found:
+            console.print(f"[red]No photo matching[/] {args.photo}")
+            return 1
+        if len(found) > 1:
+            console.print(f"[yellow]{len(found)} photos match[/] {args.photo}:")
+            for photo in found[:15]:
+                console.print(f"   {photo.path}")
+            if len(found) > 15:
+                console.print(f"   [dim]…and {len(found) - 15} more[/]")
+            return 1
+
+        photo = found[0]
+        group = photo.group_id or photo.id
+        assert group is not None
+        console.print(f"[bold]{photo.path}[/]")
+        collapsed = "" if photo.id == group else f" [dim](collapsed into group {group})[/]"
+        flat = " · [yellow]flat frame, never searched[/]" if photo.fingerprint.is_degenerate else ""
+        console.print(f"  {photo.fingerprint} · group {group}{collapsed}{flat}")
+
+        payload = repository.answer_for(group)
+        if payload is None:
+            console.print("\n[yellow]No archived answer[/] — not searched, or searched before")
+            console.print("[dim]answers were kept. A scan --again would fetch one.[/]")
+            return 0
+
+        answer = explain(payload)
+        judged = {(m.page_url, m.image_url): m for m in repository.matches_for(group)}
+        named = list({(m.page_url, m.image_url): m for m in answer.matches}.values())
+        dropped = [m for m in named if (m.page_url, m.image_url) not in judged]
+
+        guess = f' — best guess "{answer.guess}"' if answer.guess else ""
+        console.print(f"\n[bold]the engine answered[/]{guess}")
+        console.print(f"  {len(named)} candidates with an image to check")
+        if answer.unnamed_pages:
+            console.print(
+                f"  [dim]{len(answer.unnamed_pages)} pages named with no image — dropped, "
+                f"topical: 9.6% of those claims held[/]"
+            )
+        if answer.similar:
+            console.print(
+                f"  [dim]{len(answer.similar)} visually similar — dropped, "
+                f"likeness is not a copy[/]"
+            )
+
+        if judged:
+            console.print("\n[bold]what became of them[/]")
+            for match in judged.values():
+                colour = "green" if match.verdict is Verdict.CONFIRMED else "dim"
+                distance = f"d={match.distance}" if match.distance is not None else "—"
+                console.print(
+                    f"  [{colour}]{match.verdict.value:11}[/] {distance:5} {_short(match.target)}",
+                    no_wrap=True,
+                    overflow="ellipsis",
+                )
+        if dropped:
+            console.print(f"\n[yellow]{len(dropped)} dropped before storing[/] (own platform)")
+            for match in dropped[:10]:
+                console.print(
+                    f"  [dim]{match.domain:24} {_short(match.target)}[/]",
+                    no_wrap=True,
+                    overflow="ellipsis",
+                )
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     data_dir = Path(args.data_dir)
     with _repository(data_dir) as repository:
@@ -261,6 +339,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--workers", type=int, default=8, help="parallel downloads during verification (default 8)"
     )
     reparse.set_defaults(func=cmd_reparse)
+
+    trace = sub.add_parser(
+        "trace", help="everything the engine said about one photo, and what became of it"
+    )
+    trace.add_argument("photo", help="part of the photo's filename or path")
+    trace.set_defaults(func=cmd_trace)
 
     report = sub.add_parser("report", help="build the HTML report")
     report.add_argument("--out", default="imgtrail.html")
