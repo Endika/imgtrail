@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from imgtrail.cli import main
+from imgtrail.cli import build_parser, main
 
 from .conftest import image_bytes, repost_bytes
 
@@ -180,6 +180,15 @@ class TestReportAndStatus:
 
 
 class TestParser:
+    def test_the_data_dir_is_accepted_on_either_side_of_the_command(self) -> None:
+        """The README used to have to explain that it went on the left."""
+        parse = build_parser().parse_args
+
+        assert parse(["status"]).data_dir == "./imgtrail-data"
+        assert parse(["--data-dir", "/a", "status"]).data_dir == "/a"
+        assert parse(["status", "--data-dir", "/b"]).data_dir == "/b"
+        assert parse(["--data-dir", "/a", "status", "--data-dir", "/b"]).data_dir == "/b"
+
     def test_a_command_is_required(self) -> None:
         with pytest.raises(SystemExit):
             main([])

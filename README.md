@@ -134,8 +134,8 @@ put 118 false `confirmed` in a report.
 ## Commands
 
 ```
-imgtrail --data-dir DIR CMD   where the database lives (default ./imgtrail-data)
-                              — note it goes before the command, not after
+  --data-dir DIR              where the database lives (default ./imgtrail-data),
+                              accepted on any command and on either side of it
 
 imgtrail scan SOURCE          index, dedupe, search and verify — resumable
   --engine vision|lens        which index to search (default vision)
