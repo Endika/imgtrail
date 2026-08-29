@@ -400,6 +400,19 @@ class TestReportWriters:
         assert "good.example.com" in page
         assert "data:image/jpeg;base64," in page
 
+    def test_html_folds_every_card_so_the_page_opens_as_an_index(
+        self, repository: SqliteRepository, album: DictPhotoSource, tmp_path: Path
+    ) -> None:
+        """Ninety cards unfolded is the scroll this replaces."""
+        out = tmp_path / "report.html"
+
+        HtmlReportWriter(album).write(self._report(repository, album), out)
+
+        page = out.read_text(encoding="utf-8")
+        assert '<details class="card">' in page
+        assert "open>" not in page, "nothing is unfolded for you"
+        assert "<summary>" in page
+
     def test_html_survives_a_thumbnail_it_cannot_read(
         self, repository: SqliteRepository, album: DictPhotoSource, tmp_path: Path
     ) -> None:

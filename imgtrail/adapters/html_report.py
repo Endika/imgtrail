@@ -6,6 +6,8 @@ import base64
 import html
 import io
 import json
+from collections import Counter
+from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
 
@@ -14,7 +16,7 @@ from PIL import Image
 from imgtrail.domain import Report, Verdict
 from imgtrail.ports import ImageLoader
 
-THUMBNAIL_PX = 160
+THUMBNAIL_PX = 120
 BADGE_CLASS = {Verdict.CONFIRMED: "ok", Verdict.LIKELY: "warn"}
 
 CSS = """
@@ -34,17 +36,26 @@ h1 { font-size:1.6rem; margin:0 0 .3rem; letter-spacing:-.02em; }
          background:var(--card); border:1px solid var(--line); border-radius:10px; }
 .stat b { display:block; font-size:1.5rem; letter-spacing:-.02em; }
 .stat span { color:var(--muted); font-size:.8rem; text-transform:uppercase; letter-spacing:.06em; }
-.card { display:flex; gap:1.25rem; padding:1.25rem; margin-bottom:1rem; background:var(--card);
+.card { padding:.7rem .9rem; margin-bottom:.5rem; background:var(--card);
         border:1px solid var(--line); border-radius:10px; }
-.card img { width:120px; height:120px; object-fit:cover; border-radius:8px; flex:none;
-            background:var(--line); }
-.card h2 { font-size:.95rem; margin:0 0 .1rem; }
-.card .meta { color:var(--muted); font-size:.8rem; margin:0 0 .8rem; }
-.card > div { min-width:0; flex:1; }
+summary { display:flex; gap:.85rem; align-items:center; cursor:pointer; list-style:none; }
+summary::-webkit-details-marker { display:none; }
+summary::after { content:""; width:.45rem; height:.45rem; margin-left:auto; flex:none;
+                 border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+                 transform:rotate(45deg) translateY(-2px); }
+details[open] > summary::after { transform:rotate(-135deg) translateY(2px); }
+summary:hover::after { border-color:var(--accent); }
+summary img { width:44px; height:44px; object-fit:cover; border-radius:6px; flex:none;
+              background:var(--line); }
+summary .name { font-weight:600; font-size:.9rem; }
+.card .meta { color:var(--muted); font-size:.8rem; }
+summary > span { min-width:0; }
+.card ul { margin:.8rem 0 .2rem; }
 ul { list-style:none; margin:0; padding:0; }
-li { padding:.45rem 0; border-top:1px solid var(--line); font-size:.9rem;
-     display:flex; gap:.6rem; align-items:baseline; flex-wrap:wrap; }
-a { color:var(--accent); text-decoration:none; word-break:break-all; }
+li { padding:.4rem 0; border-top:1px solid var(--line); font-size:.88rem;
+     display:flex; gap:.6rem; align-items:baseline; }
+li a { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+a { color:var(--accent); text-decoration:none; }
 a:hover { text-decoration:underline; }
 .badge { font-size:.7rem; padding:.12rem .45rem; border-radius:99px; flex:none;
          text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
@@ -56,6 +67,20 @@ h2.section { font-size:1.1rem; margin:2.5rem 0 .3rem; letter-spacing:-.01em; }
 .empty { padding:3rem; text-align:center; color:var(--muted); background:var(--card);
          border:1px solid var(--line); border-radius:10px; }
 """
+
+
+def _bare(url: str) -> str:
+    """The scheme is never the interesting part, and the line has to fit."""
+    return url.removeprefix("https://").removeprefix("http://")
+
+
+def _where(domains: Iterable[str | None]) -> str:
+    """The one thing a folded card should still say: where."""
+    counted = Counter(d for d in domains if d)
+    if not counted:
+        return ""
+    first = counted.most_common(1)[0][0]
+    return first if len(counted) == 1 else f"{first} +{len(counted) - 1} more"
 
 
 class HtmlReportWriter:
@@ -79,6 +104,17 @@ class HtmlReportWriter:
             return ""
         return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
 
+    def _card(self, path: str, meta: str, items: list[str]) -> str:
+        """Folded. Forty-seven cards open at once is a scroll, not a report — the page
+        opens as an index of your photos and you unfold the one you came for."""
+        return (
+            f'<details class="card">'
+            f'<summary><img src="{self._thumbnail(path)}" alt="">'
+            f'<span><span class="name">{html.escape(Path(path).name)}</span><br>'
+            f'<span class="meta">{meta}</span></span></summary>'
+            f"<ul>{''.join(items)}</ul></details>"
+        )
+
     def _render(self, report: Report) -> str:
         escape = html.escape
         cards = []
@@ -90,7 +126,7 @@ class HtmlReportWriter:
                     if match.distance is not None
                     else ""
                 )
-                label = escape((match.title or match.target)[:110])
+                label = escape(match.title or _bare(match.target))
                 items.append(
                     f'<li><span class="badge {BADGE_CLASS[match.verdict]}">'
                     f"{escape(match.verdict.value)}</span>"
@@ -101,11 +137,13 @@ class HtmlReportWriter:
             copies = (
                 f" &middot; {finding.copies} copies in your profile" if finding.copies > 1 else ""
             )
+            where = _where(m.domain for m in finding.matches)
             cards.append(
-                f'<div class="card"><img src="{self._thumbnail(finding.photo.path)}" alt="">'
-                f"<div><h2>{escape(Path(finding.photo.path).name)}</h2>"
-                f'<p class="meta">{len(finding.matches)} matches{copies}</p>'
-                f"<ul>{''.join(items)}</ul></div></div>"
+                self._card(
+                    finding.photo.path,
+                    f"{len(finding.matches)} matches{copies} &middot; {escape(where)}",
+                    items,
+                )
             )
 
         body = "".join(cards) or (
@@ -118,14 +156,16 @@ class HtmlReportWriter:
                 f'<li><span class="badge lead">unreachable</span>'
                 f'<span class="dom">{escape(lead.domain or "")}</span>'
                 f'<a href="{escape(lead.page_url)}" target="_blank" rel="noreferrer">'
-                f"{escape((lead.title or lead.page_url)[:110])}</a></li>"
+                f"{escape(lead.title or _bare(lead.page_url))}</a></li>"
                 for lead in entry.leads
             ]
             traces.append(
-                f'<div class="card"><img src="{self._thumbnail(entry.photo.path)}" alt="">'
-                f"<div><h2>{escape(Path(entry.photo.path).name)}</h2>"
-                f'<p class="meta">{len(entry.leads)} places that could not be checked</p>'
-                f"<ul>{''.join(items)}</ul></div></div>"
+                self._card(
+                    entry.photo.path,
+                    f"{len(entry.leads)} unchecked &middot; "
+                    f"{escape(_where(lead.domain for lead in entry.leads))}",
+                    items,
+                )
             )
         if traces:
             body += (
