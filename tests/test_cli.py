@@ -132,6 +132,33 @@ class TestReparse:
         assert "0 stored answers" in capsys.readouterr().out.replace("\n", " ")
 
 
+class TestTrace:
+    def test_an_unknown_photo_is_an_error(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert run(tmp_path, "trace", "nothing-like-this") == 1
+        assert "No photo matching" in capsys.readouterr().out
+
+    def test_an_ambiguous_fragment_lists_the_candidates(
+        self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        run(tmp_path, "scan", str(album_dir), "--dry-run")
+        capsys.readouterr()
+
+        assert run(tmp_path, "trace", ".png") == 1
+        out = capsys.readouterr().out
+        assert "2 photos match" in out and "a.png" in out and "b.png" in out
+
+    def test_a_photo_never_searched_says_so_instead_of_pretending(
+        self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        run(tmp_path, "scan", str(album_dir), "--dry-run")
+        capsys.readouterr()
+
+        assert run(tmp_path, "trace", "b.png") == 0
+        assert "No archived answer" in capsys.readouterr().out
+
+
 class TestReportAndStatus:
     def test_report_writes_html_and_json(
         self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]

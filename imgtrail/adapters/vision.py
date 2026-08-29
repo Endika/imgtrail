@@ -10,6 +10,7 @@ import base64
 import io
 import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -69,6 +70,41 @@ def parse_web_detection(web: dict[str, Any]) -> list[Match]:
         push(MatchKind.PARTIAL, None, image.get("url"), None)
 
     return matches
+
+
+@dataclass(frozen=True, slots=True)
+class Explanation:
+    """Everything one answer said, including the parts the parser throws away.
+
+    The report is opinionated on purpose; this is the record it is an opinion about. It
+    exists so "why is my photo not in there" is a question the tool answers itself, rather
+    than one you answer by reading its source."""
+
+    matches: tuple[Match, ...]
+    unnamed_pages: tuple[str, ...]
+    """Pages the engine listed without pointing at an image. Dropped: 9.6% of its
+    page-level claims held when they could be checked at all."""
+    similar: tuple[str, ...]
+    """`visuallySimilarImages`. Dropped: semantic likeness is not a copy."""
+    guess: str | None
+
+
+def explain(payload: str) -> Explanation:
+    web = json.loads(payload)
+    unnamed = [
+        page["url"]
+        for page in web.get("pagesWithMatchingImages", [])
+        if page.get("url")
+        and not page.get("fullMatchingImages")
+        and not page.get("partialMatchingImages")
+    ]
+    labels = web.get("bestGuessLabels", [])
+    return Explanation(
+        matches=tuple(parse_web_detection(web)),
+        unnamed_pages=tuple(dict.fromkeys(unnamed)),
+        similar=tuple(i["url"] for i in web.get("visuallySimilarImages", []) if i.get("url")),
+        guess=labels[0].get("label") if labels else None,
+    )
 
 
 class MissingApiKey(RuntimeError):

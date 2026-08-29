@@ -19,7 +19,13 @@ from imgtrail.adapters.html_report import HtmlReportWriter, JsonReportWriter
 from imgtrail.adapters.http_fetcher import HttpImageFetcher
 from imgtrail.adapters.local_files import FileImageLoader, LocalPhotoSource
 from imgtrail.adapters.sqlite_repository import SqliteRepository
-from imgtrail.adapters.vision import MissingApiKey, VisionSearchEngine, parse_web_detection, shrink
+from imgtrail.adapters.vision import (
+    MissingApiKey,
+    VisionSearchEngine,
+    explain,
+    parse_web_detection,
+    shrink,
+)
 from imgtrail.domain import Fingerprint, Match, MatchKind, Report, Verdict
 from imgtrail.ports import (
     ImageFetcher,
@@ -188,6 +194,15 @@ class TestVisionAdapter:
     def test_the_same_pair_is_not_reported_twice(self) -> None:
         matches = parse_web_detection(self.RESPONSE)
         assert len({(m.page_url, m.image_url) for m in matches}) == len(matches)
+
+    def test_explain_accounts_for_what_the_parser_throws_away(self) -> None:
+        """The record behind the report: every part of an answer, including the dropped ones."""
+        told = explain(json.dumps({**self.RESPONSE, "bestGuessLabels": [{"label": "outcrop"}]}))
+
+        assert len(told.matches) == 4
+        assert told.unnamed_pages == ("https://nolink.example.net/page",)
+        assert told.similar == ("https://unrelated.example.com/other.jpg",)
+        assert told.guess == "outcrop"
 
     def test_an_empty_response_yields_nothing(self) -> None:
         assert parse_web_detection({}) == []
