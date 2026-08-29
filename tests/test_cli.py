@@ -92,9 +92,9 @@ class TestScan:
     ) -> None:
         run(tmp_path, "scan", str(album_dir), "--dry-run")
 
-        assert "would leave 2 of 2 unique photos searched" in capsys.readouterr().out.replace(
-            "\n", " "
-        )
+        out = capsys.readouterr().out.replace("\n", " ")
+        assert "would leave 2 of 2 unique photos searched" in out
+        assert "0 searches billed this month" in out
 
     def test_state_is_reused_across_invocations(
         self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]

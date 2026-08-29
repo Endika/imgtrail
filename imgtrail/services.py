@@ -48,10 +48,13 @@ class ScanPlan:
 
     pending: tuple[Photo, ...]
     already_searched: int
+    """Searches this plan will not repeat. Zero under `again`, which repeats all of them."""
     engine_name: str
     cost: float
     flat: int = 0
     """Photos left out because their fingerprint says nothing. Never worth paying for."""
+    spent_this_month: int = 0
+    """What the free tier has already been charged. It resets monthly; the database does not."""
 
     def __len__(self) -> int:
         return len(self.pending)
@@ -99,19 +102,25 @@ class ScanService:
             unreadable=unreadable,
         )
 
-    def plan(self, limit: int | None = None) -> ScanPlan:
-        awaiting = self._photos.representatives_awaiting_search()
+    def plan(self, limit: int | None = None, again: bool = False) -> ScanPlan:
+        """What the next scan would do. `again` re-searches what has already been paid for."""
+        awaiting = (
+            self._photos.representatives()
+            if again
+            else self._photos.representatives_awaiting_search()
+        )
         pending = [photo for photo in awaiting if not photo.fingerprint.is_degenerate]
         flat = len(awaiting) - len(pending)
         if limit is not None:
             pending = pending[:limit]
-        already = self._photos.counts().searched
+        spent = self._photos.searched_this_month()
         return ScanPlan(
             pending=tuple(pending),
-            already_searched=already,
+            already_searched=0 if again else self._photos.counts().searched,
             engine_name=self._engine.name,
-            cost=self._engine.estimated_cost(len(pending), already),
+            cost=self._engine.estimated_cost(len(pending), spent),
             flat=flat,
+            spent_this_month=spent,
         )
 
     def search(

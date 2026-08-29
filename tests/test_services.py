@@ -100,6 +100,19 @@ class TestPlanning:
         assert [p.path for p in plan.pending] == ["/album/b.png"]
         assert plan.flat == 1
 
+    def test_again_plans_the_photos_already_paid_for(
+        self, repository: SqliteRepository, album: DictPhotoSource
+    ) -> None:
+        service, _, _ = build(repository, album)
+        service.index(album)
+        service.search(service.plan())
+        assert len(service.plan()) == 0, "without it, a second scan finds nothing to do"
+
+        again = service.plan(again=True)
+
+        assert len(again) == 3
+        assert again.already_searched == 0, "it repeats them all, so none is left out"
+
     def test_planning_calls_no_engine(
         self, repository: SqliteRepository, album: DictPhotoSource
     ) -> None:

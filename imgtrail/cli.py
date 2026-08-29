@@ -99,7 +99,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"([dim]{indexed.duplicates_saved} duplicate searches saved[/])"
         )
 
-        plan = service.plan(args.limit)
+        plan = service.plan(args.limit, again=args.again)
         if plan.flat:
             left_out = "photo" if plan.flat == 1 else "photos"
             console.print(
@@ -114,7 +114,8 @@ def cmd_scan(args: argparse.Namespace) -> int:
             )
             console.print(
                 f"[dim]that would leave {plan.already_searched + len(plan)} of "
-                f"{indexed.unique} unique photos searched.[/]"
+                f"{indexed.unique} unique photos searched; "
+                f"{plan.spent_this_month} searches billed this month so far.[/]"
             )
             return 0
 
@@ -230,6 +231,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         metavar="DOMAIN",
         help="extra domain to exclude from results (repeatable)",
+    )
+    scan.add_argument(
+        "--again",
+        action="store_true",
+        help="search every photo again, including ones already searched — you pay for them twice",
     )
     scan.add_argument(
         "--no-verify", action="store_true", help="skip downloading candidates to confirm them"
