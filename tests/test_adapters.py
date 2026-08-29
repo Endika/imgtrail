@@ -12,6 +12,7 @@ import zipfile
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
@@ -21,6 +22,7 @@ from imgtrail.adapters.html_report import HtmlReportWriter, JsonReportWriter
 from imgtrail.adapters.http_fetcher import HttpImageFetcher
 from imgtrail.adapters.local_files import FileImageLoader, LocalPhotoSource
 from imgtrail.adapters.serpapi import LensSearchEngine, parse_visual_matches
+from imgtrail.adapters.serpapi import MissingApiKey as LensMissingApiKey
 from imgtrail.adapters.serpapi import shrink as lens_shrink
 from imgtrail.adapters.sqlite_repository import SqliteRepository
 from imgtrail.adapters.vision import (
@@ -417,6 +419,77 @@ class TestSerpApiAdapter:
         assert LensSearchEngine().estimated_cost(1000, already_used=250) == round(
             1000 * 15 / 1000, 2
         )
+
+
+class TestLensOverHttp:
+    """The upload-then-search path against a real server. Nothing here had ever run."""
+
+    @staticmethod
+    def _serve(found: dict[str, Any], seen: dict[str, Any]) -> Iterator[str]:
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                seen["uploaded"] = self.rfile.read(int(self.headers["Content-Length"]))
+                seen["upload_type"] = self.headers["Content-Type"]
+                self._answer({"image_id": "an-image-id"})
+
+            def do_GET(self) -> None:
+                seen["query"] = parse_qs(urlsplit(self.path).query)
+                self._answer(found)
+
+            def _answer(self, body: dict[str, Any]) -> None:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(body).encode())
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{httpd.server_address[1]}"
+        yield base
+        httpd.shutdown()
+
+    def _engine(self, base: str, key: str = "key") -> LensSearchEngine:
+        return LensSearchEngine(
+            key, upload_endpoint=f"{base}/image", search_endpoint=f"{base}/search"
+        )
+
+    def test_the_photo_is_uploaded_and_its_id_drives_the_search(self) -> None:
+        """Uploaded, never linked: this tool has no business publishing your photos."""
+        seen: dict[str, Any] = {}
+        base = next(self._serve(TestSerpApiAdapter.RESPONSE, seen))
+
+        engine = self._engine(base)
+        [answer] = engine.search([image_bytes(1)])
+        engine.close()
+
+        assert seen["upload_type"].startswith("multipart/form-data")
+        assert b"\xff\xd8\xff" in seen["uploaded"], "the JPEG itself went up"
+        assert seen["query"]["image_id"] == ["an-image-id"]
+        assert seen["query"]["engine"] == ["google_lens"]
+        assert [m.image_url for m in answer.matches] == [
+            "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1193912"
+        ]
+
+    def test_an_error_in_the_body_is_raised_not_swallowed(self) -> None:
+        seen: dict[str, Any] = {}
+        base = next(self._serve({"error": "Google Lens hasn't returned any results"}, seen))
+
+        engine = self._engine(base)
+        with pytest.raises(RuntimeError, match="any results"):
+            engine.search([image_bytes(1)])
+        engine.close()
+
+    def test_no_key_means_no_request(self) -> None:
+        seen: dict[str, Any] = {}
+        base = next(self._serve({}, seen))
+
+        with pytest.raises(LensMissingApiKey):
+            self._engine(base, key="").search([image_bytes(1)])
+
+        assert seen == {}, "nothing was uploaded"
 
 
 class TestLocalFiles:
