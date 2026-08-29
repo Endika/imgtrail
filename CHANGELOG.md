@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/Endika/imgtrail/compare/v0.5.1...v0.5.2) (2026-08-29)
+
+
+### Bug Fixes
+
+* accept --data-dir on either side of the command ([ce1e3c2](https://github.com/Endika/imgtrail/commit/ce1e3c2ab9c2ddf04e4eae41a92b191cc40dc558))
+
 ## [0.5.1](https://github.com/Endika/imgtrail/compare/v0.5.0...v0.5.1) (2026-08-29)
 
 
