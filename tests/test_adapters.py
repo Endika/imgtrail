@@ -135,6 +135,7 @@ class TestVisionAdapter:
             {"url": "https://nolink.example.net/page", "pageTitle": "No image extracted"},
         ],
         "fullMatchingImages": [{"url": "https://cdn.example.com/mine.jpg"}],
+        "partialMatchingImages": [{"url": "https://cdn.example.com/crop-of-mine.jpg"}],
         "visuallySimilarImages": [{"url": "https://unrelated.example.com/other.jpg"}],
     }
 
@@ -151,6 +152,12 @@ class TestVisionAdapter:
             in matches
         )
         assert any(m.kind is MatchKind.PARTIAL and m.domain == "forum.example.org" for m in matches)
+
+    def test_a_hosted_crop_with_no_page_is_kept(self) -> None:
+        """A repost is usually a crop, and Google often names the image but not the page."""
+        urls = {m.image_url for m in parse_web_detection(self.RESPONSE)}
+
+        assert "https://cdn.example.com/crop-of-mine.jpg" in urls
 
     def test_a_page_with_no_extracted_image_is_dropped(self) -> None:
         """Vision lists pages it merely associates with the subject — a cloud photo comes
@@ -199,6 +206,36 @@ def web_server(tmp_path: Path) -> Iterator[tuple[Path, str]]:
     httpd.shutdown()
 
 
+@pytest.fixture
+def crawler_server(tmp_path: Path) -> Iterator[tuple[Path, str]]:
+    """Facebook's lookaside in miniature: the picture for a crawler, HTML for everyone else."""
+    root = tmp_path / "crawled"
+    root.mkdir()
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *a: object, **kw: object) -> None:
+            super().__init__(*a, directory=str(root), **kw)  # type: ignore[arg-type]
+
+        def do_GET(self) -> None:
+            if "facebookexternalhit" in self.headers.get("User-Agent", ""):
+                super().do_GET()
+                return
+            body = b"<html>log in to continue</html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a: object) -> None:
+            pass
+
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield root, f"http://127.0.0.1:{httpd.server_address[1]}"
+    httpd.shutdown()
+
+
 class TestHttpFetcher:
     def test_an_image_comes_back_intact(self, web_server: tuple[Path, str]) -> None:
         root, base = web_server
@@ -218,6 +255,17 @@ class TestHttpFetcher:
 
         with HttpImageFetcher() as fetcher:
             assert fetcher.fetch(f"{base}/page.html") is None
+
+    def test_a_host_that_only_answers_crawlers_is_asked_as_one(
+        self, crawler_server: tuple[Path, str]
+    ) -> None:
+        root, base = crawler_server
+        (root / "photo.png").write_bytes(image_bytes(1))
+
+        with HttpImageFetcher() as honest:
+            assert honest.fetch(f"{base}/photo.png") is None, "no crawler agent, no picture"
+        with HttpImageFetcher(crawler_hosts={"127.0.0.1": "facebookexternalhit/1.1"}) as knocking:
+            assert knocking.fetch(f"{base}/photo.png") == image_bytes(1)
 
 
 class TestLocalFiles:
