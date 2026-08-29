@@ -85,6 +85,12 @@ def cmd_scan(args: argparse.Namespace) -> int:
         )
 
         plan = service.plan(args.limit)
+        if plan.flat:
+            left_out = "photo" if plan.flat == 1 else "photos"
+            console.print(
+                f"[yellow]{plan.flat} flat {left_out} left out[/][dim]: nothing to fingerprint, "
+                f"and a flat frame matches every other flat frame online.[/]"
+            )
         if args.dry_run:
             console.print(
                 f"[yellow]dry-run[/]: would run [bold]{len(plan)}[/] searches on "

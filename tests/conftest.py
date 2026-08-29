@@ -30,6 +30,13 @@ def image_bytes(seed: int, size: tuple[int, int] = (400, 400)) -> bytes:
     return buffer.getvalue()
 
 
+def flat_bytes(size: tuple[int, int] = (400, 400)) -> bytes:
+    """A frame with nothing in it — a black story, a blank export. pHash has no purchase."""
+    buffer = io.BytesIO()
+    Image.new("RGB", size, (0, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 def repost_bytes(seed: int) -> bytes:
     """The same photo after a crop and a lossy re-encode — what a repost looks like."""
     with Image.open(io.BytesIO(image_bytes(seed))) as original:

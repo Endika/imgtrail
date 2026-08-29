@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from imgtrail.domain import (
+    CONFIRMED_DISTANCE,
     Fingerprint,
     Match,
     MatchKind,
@@ -14,7 +15,7 @@ from imgtrail.domain import (
     verdict_for,
 )
 
-from .conftest import image_bytes, repost_bytes
+from .conftest import flat_bytes, image_bytes, repost_bytes
 
 
 class TestFingerprint:
@@ -29,6 +30,17 @@ class TestFingerprint:
         one, two = Fingerprint.of(image_bytes(3)), Fingerprint.of(image_bytes(4))
         assert one.distance_to(one) == 0
         assert one.distance_to(two) == two.distance_to(one)
+
+    def test_a_flat_frame_has_no_usable_fingerprint(self) -> None:
+        assert Fingerprint.of(flat_bytes()).is_degenerate
+
+    def test_a_photograph_has_one(self) -> None:
+        assert not Fingerprint.of(image_bytes(1)).is_degenerate
+
+    def test_two_flat_frames_look_identical_which_is_the_whole_problem(self) -> None:
+        black, white = Fingerprint.of(flat_bytes()), Fingerprint("0000000000000001")
+
+        assert black.distance_to(white) <= CONFIRMED_DISTANCE
 
 
 class TestVerdict:

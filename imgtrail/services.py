@@ -49,6 +49,8 @@ class ScanPlan:
     already_searched: int
     engine_name: str
     cost: float
+    flat: int = 0
+    """Photos left out because their fingerprint says nothing. Never worth paying for."""
 
     def __len__(self) -> int:
         return len(self.pending)
@@ -95,7 +97,9 @@ class ScanService:
         )
 
     def plan(self, limit: int | None = None) -> ScanPlan:
-        pending = self._photos.representatives_awaiting_search()
+        awaiting = self._photos.representatives_awaiting_search()
+        pending = [photo for photo in awaiting if not photo.fingerprint.is_degenerate]
+        flat = len(awaiting) - len(pending)
         if limit is not None:
             pending = pending[:limit]
         already = self._photos.counts().searched
@@ -104,6 +108,7 @@ class ScanService:
             already_searched=already,
             engine_name=self._engine.name,
             cost=self._engine.estimated_cost(len(pending), already),
+            flat=flat,
         )
 
     def search(
@@ -181,10 +186,13 @@ class ReportService:
         for group_id, match in rows:
             by_group.setdefault(group_id, []).append(match)
 
+        # A flat frame matches every other flat frame online, so its "findings" are an
+        # artefact of the fingerprint, not a copy of anything. Dropped here as well as at
+        # search time, which also cleans the reports of databases searched before the fix.
         findings = [
             Finding(photo=photos[group_id], copies=sizes.get(group_id, 1), matches=tuple(items))
             for group_id, items in by_group.items()
-            if group_id in photos
+            if group_id in photos and not photos[group_id].fingerprint.is_degenerate
         ]
         findings.sort(key=lambda f: (-len(f.matches), f.photo.path))
 

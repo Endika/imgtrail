@@ -42,6 +42,18 @@ class Fingerprint:
     def distance_to(self, other: Fingerprint) -> int:
         return int(imagehash.hex_to_hash(self.value) - imagehash.hex_to_hash(other.value))
 
+    @property
+    def is_degenerate(self) -> bool:
+        """True when the picture had no detail to hash, and the fingerprint means nothing.
+
+        A pHash sets one bit per frequency above the median, so a real photograph always
+        lands on half of them. A flat frame — a black story, a blank export — has no
+        median to split and collapses onto a near-empty hash, which then sits at distance
+        zero from every other flat frame on the internet. One such frame put 118 false
+        `confirmed` in a report, and this is the line that keeps it out."""
+        bits = 4 * len(self.value)
+        return abs(bin(int(self.value, 16)).count("1") - bits // 2) > bits // 4
+
     def __str__(self) -> str:
         return self.value
 
