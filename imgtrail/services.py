@@ -102,12 +102,17 @@ class ScanService:
             unreadable=unreadable,
         )
 
-    def plan(self, limit: int | None = None, again: bool = False) -> ScanPlan:
-        """What the next scan would do. `again` re-searches what has already been paid for."""
+    def plan(
+        self, limit: int | None = None, again: bool = False, under: str | None = None
+    ) -> ScanPlan:
+        """What the next scan would do.
+
+        `again` re-searches what has already been paid for; `under` keeps the plan to the
+        photos of one source, so pointing at a folder never spends the budget elsewhere."""
         awaiting = (
-            self._photos.representatives()
+            self._photos.representatives(under)
             if again
-            else self._photos.representatives_awaiting_search()
+            else self._photos.representatives_awaiting_search(under)
         )
         pending = [photo for photo in awaiting if not photo.fingerprint.is_degenerate]
         flat = len(awaiting) - len(pending)

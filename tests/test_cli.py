@@ -96,6 +96,20 @@ class TestScan:
         assert "would leave 2 of 2 unique photos searched" in out
         assert "0 searches billed this month" in out
 
+    def test_pointing_at_a_second_folder_does_not_replan_the_first(
+        self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The folder you name is the folder you pay for."""
+        run(tmp_path, "scan", str(album_dir), "--dry-run")
+        just_one = tmp_path / "elsewhere"
+        just_one.mkdir()
+        (just_one / "only.png").write_bytes(image_bytes(42))
+        capsys.readouterr()
+
+        run(tmp_path, "scan", str(just_one), "--dry-run")
+
+        assert "would run 1 searches" in capsys.readouterr().out.replace("\n", " ")
+
     def test_state_is_reused_across_invocations(
         self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import zipfile
 from collections import Counter
 from collections.abc import Iterator, Mapping
@@ -45,6 +46,14 @@ class LocalPhotoSource(FileImageLoader):
                 continue
             self._taken += 1
             yield str(path.resolve())
+
+    @property
+    def prefix(self) -> str:
+        """Every reference this source yields starts with this.
+
+        It is what keeps a scan to the folder you named: without it, pointing at seven
+        photos plans a search over every photo the database has ever seen."""
+        return f"{self._unpacked().resolve()}{os.sep}"
 
     @property
     def taken(self) -> int:
