@@ -114,7 +114,10 @@ class TestSqliteRepository:
 
         database = tmp_path / "state" / "imgtrail.db"
         with Store(database) as first:
-            ScanService(first, first, FakeSearchEngine(), album, DictImageFetcher()).index(album)
+            service = ScanService(
+                first, first, FakeSearchEngine(), album, DictImageFetcher(), first
+            )
+            service.index(album)
 
         with Store(database) as second:
             assert second.counts().photos == 4
@@ -353,7 +356,7 @@ class TestReportWriters:
             ]
         )
         fetcher = DictImageFetcher({"https://good.example.com/i.jpg": album.images["/album/a.png"]})
-        service = ScanService(repository, repository, engine, album, fetcher)
+        service = ScanService(repository, repository, engine, album, fetcher, repository)
         service.index(album)
         service.search(service.plan())
         service.verify(workers=2)
@@ -406,7 +409,9 @@ class TestReportWriters:
     def test_an_empty_report_says_so(
         self, repository: SqliteRepository, album: DictPhotoSource, tmp_path: Path
     ) -> None:
-        service = ScanService(repository, repository, FakeSearchEngine(), album, DictImageFetcher())
+        service = ScanService(
+            repository, repository, FakeSearchEngine(), album, DictImageFetcher(), repository
+        )
         service.index(album)
         out = tmp_path / "report.html"
 
@@ -477,7 +482,22 @@ class TestVisionOverHttp:
         results = engine.search([image_bytes(1), image_bytes(2)])
         engine.close()
 
-        assert [m[0].domain for m in results] == ["one.example", "two.example"]
+        assert [a.matches[0].domain for a in results] == ["one.example", "two.example"]
+
+    def test_the_answer_is_kept_verbatim_so_it_can_be_read_again(self) -> None:
+        sent: list[dict[str, Any]] = []
+        payload = {
+            "responses": [
+                {"webDetection": {"fullMatchingImages": [{"url": "https://one.example/a.jpg"}]}}
+            ]
+        }
+        endpoint = next(self._serve([payload], sent))
+
+        engine = VisionSearchEngine("key", endpoint=endpoint)
+        [answer] = engine.search([image_bytes(1)])
+        engine.close()
+
+        assert engine.parse(answer.payload) == list(answer.matches)
 
     def test_an_api_error_is_raised_not_swallowed(self) -> None:
         sent: list[dict[str, Any]] = []

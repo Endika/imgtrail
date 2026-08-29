@@ -23,13 +23,17 @@ imgtrail report --open
 ## What it finds, and what it doesn't
 
 It searches Google's index, so it finds your photos on **blogs, news sites, Pinterest, Tumblr,
-forums, scraper mirrors and shops that lifted your pictures**.
+forums, scraper mirrors and shops that lifted your pictures** — and on **public Facebook posts
+and groups**, which is where a photograph of somewhere recognisable tends to end up.
 
 It will **not** find a repost on another Instagram account. Instagram blocks crawling of post
 images, so they aren't in anyone's index — the only way such a repost surfaces here is
 indirectly, via one of the many "Instagram viewer" mirror sites that *are* indexed. Telegram,
-WhatsApp, TikTok, Facebook and private accounts are invisible to it too. If your question is
-"is someone reposting me inside Instagram", this is the wrong tool and there isn't a good one.
+WhatsApp, TikTok and private accounts are invisible to it too. If your question is "is someone
+reposting me inside Instagram", this is the wrong tool and there isn't a good one.
+
+Your own Facebook page is not filtered out: from a group post there is no telling whose it is.
+If you cross-post everything from Instagram, `--ignore-domain facebook.com`.
 
 ## Install
 
@@ -82,12 +86,19 @@ imgtrail scan SOURCE          index, dedupe, search and verify — resumable
   --threshold N               pHash distance for "same photo" (default 6)
   --ignore-domain DOMAIN      exclude a domain from results (repeatable)
   --no-verify                 skip the download-and-compare pass
+imgtrail reparse              re-read the stored answers under today's filters
+  --ignore-domain DOMAIN      exclude a domain from results (repeatable)
 imgtrail report --open        build the HTML report and open it
 imgtrail status               what's in the database so far
 ```
 
 State lives in `./imgtrail-data`. Everything is idempotent: re-running `scan` searches only
 what it hasn't searched before, so an interrupted run costs nothing to resume.
+
+Every answer a search engine gives is kept verbatim. Filtering is a pile of judgement calls —
+which platforms are yours, which candidates are worth downloading — and at least one of them
+is wrong. `reparse` re-reads what you already paid for under the current rules, without
+calling anything, so correcting a filter costs nothing.
 
 ## Privacy
 

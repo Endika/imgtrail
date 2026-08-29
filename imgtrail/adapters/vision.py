@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 from collections.abc import Sequence
 from typing import Any
 
 import httpx
 from PIL import Image
 
-from imgtrail.domain import Match, MatchKind
+from imgtrail.domain import Match, MatchKind, SearchAnswer
 
 ENDPOINT = "https://vision.googleapis.com/v1/images:annotate"
 PRICE_PER_1K = 3.50
@@ -96,10 +97,13 @@ class VisionSearchEngine:
         billable = max(0, units + already_used - FREE_UNITS_PER_MONTH)
         return round(billable * PRICE_PER_1K / 1000, 2)
 
-    def search(self, images: Sequence[bytes]) -> list[list[Match]]:
+    def parse(self, payload: str) -> list[Match]:
+        return parse_web_detection(json.loads(payload))
+
+    def search(self, images: Sequence[bytes]) -> list[SearchAnswer]:
         if not self._key:
             raise MissingApiKey
-        results: list[list[Match]] = []
+        results: list[SearchAnswer] = []
         for start in range(0, len(images), self.batch_size):
             chunk = images[start : start + self.batch_size]
             response = self._client.post(
@@ -119,5 +123,8 @@ class VisionSearchEngine:
             for item in response.json().get("responses", []):
                 if "error" in item:
                     raise RuntimeError(item["error"].get("message", "Vision API error"))
-                results.append(parse_web_detection(item.get("webDetection", {})))
+                web = item.get("webDetection", {})
+                results.append(
+                    SearchAnswer(matches=tuple(parse_web_detection(web)), payload=json.dumps(web))
+                )
         return results

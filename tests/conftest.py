@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import random
 from collections.abc import Iterator, Sequence
 from pathlib import Path
@@ -11,7 +12,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from imgtrail.adapters.sqlite_repository import SqliteRepository
-from imgtrail.domain import Match
+from imgtrail.domain import Match, MatchKind, SearchAnswer
 
 
 def image_bytes(seed: int, size: tuple[int, int] = (400, 400)) -> bytes:
@@ -63,7 +64,10 @@ class DictPhotoSource:
 
 
 class FakeSearchEngine:
-    """Answers with canned matches and records exactly what it was asked about."""
+    """Answers with canned matches and records exactly what it was asked about.
+
+    Its payload is a real serialisation it can read back, so a reparse in a test goes
+    through the same round trip the Vision adapter does."""
 
     name = "fake"
     batch_size = 2  # small on purpose, so batching is actually exercised
@@ -73,13 +77,40 @@ class FakeSearchEngine:
         self.calls = 0
         self.images_seen: list[bytes] = []
 
-    def search(self, images: Sequence[bytes]) -> list[list[Match]]:
+    def search(self, images: Sequence[bytes]) -> list[SearchAnswer]:
         self.calls += 1
         self.images_seen.extend(images)
-        answers: list[list[Match]] = []
+        answers: list[SearchAnswer] = []
         for _ in images:
-            answers.append(self._answers.pop(0) if self._answers else [])
+            matches = self._answers.pop(0) if self._answers else []
+            answers.append(
+                SearchAnswer(
+                    matches=tuple(matches),
+                    payload=json.dumps(
+                        [
+                            {
+                                "kind": m.kind.value,
+                                "image_url": m.image_url,
+                                "page_url": m.page_url,
+                                "title": m.title,
+                            }
+                            for m in matches
+                        ]
+                    ),
+                )
+            )
         return answers
+
+    def parse(self, payload: str) -> list[Match]:
+        return [
+            Match(
+                kind=MatchKind(entry["kind"]),
+                image_url=entry["image_url"],
+                page_url=entry["page_url"],
+                title=entry["title"],
+            )
+            for entry in json.loads(payload)
+        ]
 
     def estimated_cost(self, units: int, already_used: int = 0) -> float:
         return 0.0

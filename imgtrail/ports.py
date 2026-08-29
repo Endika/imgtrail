@@ -10,7 +10,7 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from .domain import Fingerprint, Match, Photo, Report, Summary, Verdict
+from .domain import Fingerprint, Match, Photo, Report, SearchAnswer, Summary, Verdict
 
 
 @runtime_checkable
@@ -34,8 +34,11 @@ class SearchEngine(Protocol):
     name: str
     batch_size: int
 
-    def search(self, images: Sequence[bytes]) -> list[list[Match]]:
-        """Answer one list of matches per image, in the order given."""
+    def search(self, images: Sequence[bytes]) -> list[SearchAnswer]:
+        """Answer once per image, in the order given. Costs money; call it sparingly."""
+
+    def parse(self, payload: str) -> list[Match]:
+        """Re-read one of its own payloads. Free, and the reason payloads are kept."""
 
     def estimated_cost(self, units: int, already_used: int = 0) -> float: ...
 
@@ -46,6 +49,14 @@ class SearchEngine(Protocol):
 class ImageFetcher(Protocol):
     def fetch(self, url: str) -> bytes | None:
         """Download a candidate. None when it is unreachable or is not an image."""
+
+
+@runtime_checkable
+class ResponseArchive(Protocol):
+    """Keeps what a search engine answered, so re-reading it never costs a search."""
+
+    def save(self, group_id: int, engine: str, payload: str) -> None: ...
+    def all(self) -> list[tuple[int, str]]: ...
 
 
 @runtime_checkable

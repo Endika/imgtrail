@@ -134,6 +134,18 @@ class Match:
         return replace(self, verdict=Verdict.UNREACHABLE, distance=None)
 
 
+@dataclass(frozen=True, slots=True)
+class SearchAnswer:
+    """What an engine said about one photo: the matches, and the words it said them in.
+
+    The payload is kept verbatim because every filter in this project is a judgement call
+    that will be got wrong at least once. Without it, correcting one means paying for the
+    whole search again; with it, the correction is a re-read of a string."""
+
+    matches: tuple[Match, ...]
+    payload: str
+
+
 OWN_PLATFORMS = frozenset(
     {
         "instagram.com",

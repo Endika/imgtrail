@@ -107,6 +107,17 @@ class TestScan:
         assert "+0 new" in capsys.readouterr().out
 
 
+class TestReparse:
+    def test_it_re_reads_stored_answers_without_searching(
+        self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        run(tmp_path, "scan", str(album_dir), "--dry-run")
+        capsys.readouterr()
+
+        assert run(tmp_path, "reparse") == 0
+        assert "0 stored answers" in capsys.readouterr().out.replace("\n", " ")
+
+
 class TestReportAndStatus:
     def test_report_writes_html_and_json(
         self, album_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
