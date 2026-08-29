@@ -20,7 +20,7 @@ from .adapters.local_files import FileImageLoader, LocalPhotoSource
 from .adapters.sqlite_repository import SqliteRepository
 from .adapters.vision import FREE_UNITS_PER_MONTH, PRICE_PER_1K, VisionSearchEngine
 from .domain import OWN_PLATFORMS, Verdict
-from .services import ReportService, ScanService
+from .services import IndexResult, ReportService, ScanService
 
 console = Console()
 
@@ -49,6 +49,21 @@ def _progress() -> Progress:
     )
 
 
+def _source_tally(source: LocalPhotoSource, indexed: IndexResult) -> str:
+    """Every picture the source saw, and where the ones that did not make it went.
+
+    Without this line a skipped folder is invisible: the run reports the photos it kept
+    and nothing at all about the ones it never looked at."""
+    skipped = sum(source.skipped.values())
+    parts = [f"[bold]{source.taken + skipped}[/] images in the source"]
+    if skipped:
+        where = ", ".join(f"{n} in {folder}" for folder, n in sorted(source.skipped.items()))
+        parts.append(f"[yellow]{skipped} skipped[/] ({where})")
+    if indexed.unreadable:
+        parts.append(f"[yellow]{indexed.unreadable} unreadable[/]")
+    return " · ".join(parts)
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
     data_dir = Path(args.data_dir)
     source = LocalPhotoSource(Path(args.source).expanduser(), data_dir)
@@ -62,6 +77,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
         if indexed.total == 0:
             console.print(f"[red]No images found in {args.source}.")
             return 1
+        console.print(_source_tally(source, indexed))
         console.print(
             f"[bold]{indexed.total}[/] photos ([green]+{indexed.added}[/] new) → "
             f"[bold]{indexed.unique}[/] unique after dedupe "
@@ -74,6 +90,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
                 f"[yellow]dry-run[/]: would run [bold]{len(plan)}[/] searches on "
                 f"{plan.engine_name}. Estimated cost [bold]${plan.cost}[/] "
                 f"({FREE_UNITS_PER_MONTH} free per month, then ${PRICE_PER_1K}/1000)."
+            )
+            console.print(
+                f"[dim]that would leave {plan.already_searched + len(plan)} of "
+                f"{indexed.unique} unique photos searched.[/]"
             )
             return 0
 
@@ -89,6 +109,11 @@ def cmd_scan(args: argparse.Namespace) -> int:
                     service.search(plan, platforms, on_batch=lambda n: bar.advance(task, n))
             else:
                 console.print("[dim]Nothing new to search.[/]")
+            searched = repository.counts()
+            console.print(
+                f"[bold]{searched.searched}[/] of [bold]{searched.unique}[/] "
+                f"unique photos searched on {plan.engine_name}"
+            )
 
             if not args.no_verify:
                 outstanding = len(repository.awaiting_verdict())
