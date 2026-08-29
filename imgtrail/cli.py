@@ -334,9 +334,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="./imgtrail-data",
         help="where to keep the database and the extracted archive",
     )
+    # The same flag on every subcommand, so both orders work. A tool whose README has to
+    # explain that a flag goes on the left is a tool with the flag in the wrong place.
+    # SUPPRESS matters: without it argparse would overwrite the outer value with this
+    # one's default every time the subcommand omitted it.
+    anywhere = argparse.ArgumentParser(add_help=False)
+    anywhere.add_argument("--data-dir", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+
     sub = parser.add_subparsers(dest="command", required=True)
 
-    scan = sub.add_parser("scan", help="index, dedupe, search and verify")
+    scan = sub.add_parser("scan", help="index, dedupe, search and verify", parents=[anywhere])
     scan.add_argument("source", help="Instagram data export (.zip) or a folder of images")
     scan.add_argument(
         "--engine",
@@ -382,7 +389,9 @@ def build_parser() -> argparse.ArgumentParser:
     scan.set_defaults(func=cmd_scan)
 
     reparse = sub.add_parser(
-        "reparse", help="re-read the stored answers under today's filters, without searching"
+        "reparse",
+        help="re-read the stored answers under today's filters, without searching",
+        parents=[anywhere],
     )
     reparse.add_argument(
         "--ignore-domain",
@@ -404,13 +413,13 @@ def build_parser() -> argparse.ArgumentParser:
     trace.add_argument("photo", help="part of the photo's filename or path")
     trace.set_defaults(func=cmd_trace)
 
-    report = sub.add_parser("report", help="build the HTML report")
+    report = sub.add_parser("report", help="build the HTML report", parents=[anywhere])
     report.add_argument("--out", default="imgtrail.html")
     report.add_argument("--json", metavar="FILE", help="also dump findings as JSON")
     report.add_argument("--open", action="store_true", help="open it in the browser")
     report.set_defaults(func=cmd_report)
 
-    status = sub.add_parser("status", help="summary of what is in the database")
+    status = sub.add_parser("status", help="summary of what is in the database", parents=[anywhere])
     status.set_defaults(func=cmd_status)
     return parser
 
