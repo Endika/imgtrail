@@ -217,3 +217,5 @@ testing — a real local HTTP server speaking Vision's and SerpApi's JSON.
 ## Licence
 
 MIT
+
+<!-- branch protection smoke test -->
