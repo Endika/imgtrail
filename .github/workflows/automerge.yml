@@ -23,12 +23,15 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # Majors stay manual: they are where a breaking change actually lives.
+      # The token MUST be a PAT here too, for the reason spelled out in the release
+      # job below: a merge signed by GITHUB_TOKEN triggers no workflow at all, so
+      # nothing would run for the bump it just landed on main.
       - name: queue the merge behind the required checks
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         run: gh pr merge --auto --rebase "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
   release:
     name: auto-merge release-please
