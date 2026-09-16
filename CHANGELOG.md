@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/Endika/imgtrail/compare/v0.6.0...v0.7.0) (2026-09-16)
+
+
+### Features
+
+* **ci:** add CodeQL static analysis ([63c7f89](https://github.com/Endika/imgtrail/commit/63c7f8965cf06caa0a452a11f47c3dcba2eac757))
+
 ## [0.6.0](https://github.com/Endika/imgtrail/compare/v0.5.2...v0.6.0) (2026-09-16)
 
 
