@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/Endika/imgtrail/compare/v0.5.2...v0.6.0) (2026-09-16)
+
+
+### Features
+
+* **ci:** block PRs that introduce high-severity dependency advisories ([672b902](https://github.com/Endika/imgtrail/commit/672b902984316e9274dea3cb07e8876e365af802))
+
 ## [0.5.2](https://github.com/Endika/imgtrail/compare/v0.5.1...v0.5.2) (2026-08-29)
 
 
