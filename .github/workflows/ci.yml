@@ -64,9 +64,18 @@ jobs:
           name: distributions
           path: dist/
 
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5
+        if: github.event_name == 'pull_request'
+        with:
+          fail-on-severity: high
+
   all-green:
     name: all-green
-    needs: [quality, test, build]
+    needs: [quality, test, build, dependency-review]
     if: always()
     runs-on: ubuntu-latest
     steps:
