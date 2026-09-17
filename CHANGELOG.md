@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/Endika/imgtrail/compare/v0.7.0...v0.7.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **ports:** replace bare ellipsis bodies with pass ([a5971e6](https://github.com/Endika/imgtrail/commit/a5971e63befbbd62328f647f8b15f1893faaf3a0))
+
 ## [0.7.0](https://github.com/Endika/imgtrail/compare/v0.6.0...v0.7.0) (2026-09-16)
 
 
