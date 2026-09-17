@@ -100,9 +100,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
     data_dir = Path(args.data_dir)
     source = LocalPhotoSource(Path(args.source).expanduser(), data_dir)
     engine = _engine(args.engine, _api_key(args.api_key, args.engine))
-    fetcher = HttpImageFetcher()
-
-    with _repository(data_dir) as repository:
+    with _repository(data_dir) as repository, HttpImageFetcher() as fetcher:
         service = ScanService(repository, repository, engine, source, fetcher, repository)
 
         indexed = service.index(source, args.threshold)
@@ -160,7 +158,6 @@ def cmd_scan(args: argparse.Namespace) -> int:
                 _verify(service, repository, args.workers)
         finally:
             engine.close()
-            fetcher.close()
 
     console.print(f"\nDone. Run [bold]imgtrail report --data-dir {data_dir}[/] for the report.")
     return 0
@@ -170,40 +167,36 @@ def cmd_reparse(args: argparse.Namespace) -> int:
     """Re-read the answers already paid for. The filters may have been wrong; the money
     was still spent, and this is what makes correcting them free."""
     data_dir = Path(args.data_dir)
-    fetcher = HttpImageFetcher()
     platforms = OWN_PLATFORMS | frozenset(args.ignore_domain or [])
-    with _repository(data_dir) as repository:
-        try:
-            seen = 0
-            for name in ("vision", "lens"):
-                engine = _engine(name)
-                stored = len(repository.all(engine.name))
-                seen += stored
-                if not stored:
-                    continue
-                service = ScanService(
-                    repository, repository, engine, FileImageLoader(), fetcher, repository
-                )
-                recovered = service.reparse(platforms)
-                engine.close()
-                console.print(
-                    f"[bold]{recovered}[/] candidates recovered from {stored} "
-                    f"{engine.name} answers [dim](no search, no cost)[/]"
-                )
-            if not seen:
-                console.print("[dim]No archived answers yet — nothing to re-read.[/]")
-            if not args.no_verify:
-                service = ScanService(
-                    repository,
-                    repository,
-                    _engine("vision"),
-                    FileImageLoader(),
-                    fetcher,
-                    repository,
-                )
-                _verify(service, repository, args.workers)
-        finally:
-            fetcher.close()
+    with _repository(data_dir) as repository, HttpImageFetcher() as fetcher:
+        seen = 0
+        for name in ("vision", "lens"):
+            engine = _engine(name)
+            stored = len(repository.all(engine.name))
+            seen += stored
+            if not stored:
+                continue
+            service = ScanService(
+                repository, repository, engine, FileImageLoader(), fetcher, repository
+            )
+            recovered = service.reparse(platforms)
+            engine.close()
+            console.print(
+                f"[bold]{recovered}[/] candidates recovered from {stored} "
+                f"{engine.name} answers [dim](no search, no cost)[/]"
+            )
+        if not seen:
+            console.print("[dim]No archived answers yet — nothing to re-read.[/]")
+        if not args.no_verify:
+            service = ScanService(
+                repository,
+                repository,
+                _engine("vision"),
+                FileImageLoader(),
+                fetcher,
+                repository,
+            )
+            _verify(service, repository, args.workers)
     console.print(f"\nDone. Run [bold]imgtrail --data-dir {data_dir} report[/] for the report.")
     return 0
 
