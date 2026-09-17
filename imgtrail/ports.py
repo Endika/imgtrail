@@ -42,9 +42,11 @@ class SearchEngine(Protocol):
     def parse(self, payload: str) -> SearchAnswer:
         """Re-read one of its own payloads. Free, and the reason payloads are kept."""
 
-    def estimated_cost(self, units: int, already_used: int = 0) -> float: ...
+    def estimated_cost(self, units: int, already_used: int = 0) -> float:
+        pass
 
-    def close(self) -> None: ...
+    def close(self) -> None:
+        pass
 
 
 @runtime_checkable
@@ -57,48 +59,88 @@ class ImageFetcher(Protocol):
 class ResponseArchive(Protocol):
     """Keeps what a search engine answered, so re-reading it never costs a search."""
 
-    def save(self, group_id: int, engine: str, payload: str) -> None: ...
-    def all(self, engine: str) -> list[tuple[int, str]]: ...
-    def answers_for(self, group_id: int) -> list[tuple[str, str]]: ...
+    def save(self, group_id: int, engine: str, payload: str) -> None:
+        pass
+
+    def all(self, engine: str) -> list[tuple[int, str]]:
+        pass
+
+    def answers_for(self, group_id: int) -> list[tuple[str, str]]:
+        pass
 
 
 @runtime_checkable
 class PhotoRepository(Protocol):
-    def add(self, photo: Photo) -> None: ...
-    def known_references(self) -> set[str]: ...
-    def fingerprints(self) -> list[tuple[int, Fingerprint]]: ...
-    def assign_groups(self, assignment: dict[int, int]) -> None: ...
+    def add(self, photo: Photo) -> None:
+        pass
+
+    def known_references(self) -> set[str]:
+        pass
+
+    def fingerprints(self) -> list[tuple[int, Fingerprint]]:
+        pass
+
+    def assign_groups(self, assignment: dict[int, int]) -> None:
+        pass
+
     def representatives_awaiting_search(
         self,
         under: str | None = None,
         engine: str | None = None,
         only_blank: bool = False,
-    ) -> list[Photo]: ...
-    def representatives(
-        self, under: str | None = None, only_blank: bool = False
-    ) -> list[Photo]: ...
-    def searched_this_month(self, engine: str | None = None) -> int: ...
-    def searched_by(self, engine: str) -> int: ...
-    def matching(self, fragment: str) -> list[Photo]: ...
-    def mark_searched(self, group_id: int, engine: str) -> None: ...
-    def counts(self) -> Summary: ...
-    def by_ids(self, ids: Sequence[int]) -> dict[int, Photo]: ...
-    def group_sizes(self) -> dict[int, int]: ...
+    ) -> list[Photo]:
+        pass
+
+    def representatives(self, under: str | None = None, only_blank: bool = False) -> list[Photo]:
+        pass
+
+    def searched_this_month(self, engine: str | None = None) -> int:
+        pass
+
+    def searched_by(self, engine: str) -> int:
+        pass
+
+    def matching(self, fragment: str) -> list[Photo]:
+        pass
+
+    def mark_searched(self, group_id: int, engine: str) -> None:
+        pass
+
+    def counts(self) -> Summary:
+        pass
+
+    def by_ids(self, ids: Sequence[int]) -> dict[int, Photo]:
+        pass
+
+    def group_sizes(self) -> dict[int, int]:
+        pass
 
 
 @runtime_checkable
 class MatchRepository(Protocol):
-    def add_all(self, group_id: int, matches: Sequence[Match]) -> int: ...
-    def matches_for(self, group_id: int) -> list[Match]: ...
+    def add_all(self, group_id: int, matches: Sequence[Match]) -> int:
+        pass
+
+    def matches_for(self, group_id: int) -> list[Match]:
+        pass
+
     def leads(self) -> list[tuple[int, Lead]]:
         """Candidates that could not be downloaded. Derived, never written."""
 
-    def awaiting_verdict(self) -> list[tuple[Match, Fingerprint]]: ...
-    def record(self, match: Match) -> None: ...
-    def findings(self, verdicts: Sequence[Verdict]) -> list[tuple[int, Match]]: ...
-    def tally(self) -> dict[Verdict, int]: ...
+    def awaiting_verdict(self) -> list[tuple[Match, Fingerprint]]:
+        pass
+
+    def record(self, match: Match) -> None:
+        pass
+
+    def findings(self, verdicts: Sequence[Verdict]) -> list[tuple[int, Match]]:
+        pass
+
+    def tally(self) -> dict[Verdict, int]:
+        pass
 
 
 @runtime_checkable
 class ReportWriter(Protocol):
-    def write(self, report: Report, destination: Path) -> None: ...
+    def write(self, report: Report, destination: Path) -> None:
+        pass
