@@ -590,7 +590,7 @@ class TestReportWriters:
         HtmlReportWriter(album).write(self._report(repository, album), out)
 
         page = out.read_text(encoding="utf-8")
-        assert "good.example.com" in page
+        assert "https://good.example.com/p" in page
         assert "data:image/jpeg;base64," in page
 
     def test_html_folds_every_card_so_the_page_opens_as_an_index(
