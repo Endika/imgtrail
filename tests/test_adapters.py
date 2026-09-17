@@ -169,7 +169,6 @@ class TestSqliteRepository:
     def test_legacy_page_only_rows_are_dropped_on_open(self, tmp_path: Path) -> None:
         """Databases written before page-only hits were rejected still hold them. They
         carry no image, so they can never become domain objects — opening must clear them."""
-        import sqlite3
 
         database = tmp_path / "old.db"
         SqliteRepository(database).close()
@@ -675,7 +674,6 @@ class TestReportWriters:
     def test_json_is_machine_readable(
         self, repository: SqliteRepository, album: DictPhotoSource, tmp_path: Path
     ) -> None:
-        import json
 
         out = tmp_path / "findings.json"
         JsonReportWriter().write(self._report(repository, album), out)
