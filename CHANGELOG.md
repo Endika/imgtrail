@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/Endika/imgtrail/compare/v0.7.1...v0.7.2) (2026-09-27)
+
+
+### Documentation
+
+* update the test count and cut rhetorical lines from the readme ([307afec](https://github.com/Endika/imgtrail/commit/307afec9ae44ec72161c67217fe516e84aaf872a))
+
 ## [0.7.1](https://github.com/Endika/imgtrail/compare/v0.7.0...v0.7.1) (2026-09-17)
 
 
