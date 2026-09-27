@@ -12,7 +12,7 @@ Find out where else on the web your own photos show up.
 Point it at your Instagram data export. It hashes every photo, collapses the near-duplicates
 so you never pay to search the same picture twice, runs each unique one through reverse image
 search, and then **downloads every candidate and compares it against your original** before
-putting it in the report. What you get back is a list you can trust, not a pile of URLs.
+putting it in the report.
 
 ```
 imgtrail scan ~/Downloads/instagram-export.zip --dry-run
@@ -76,7 +76,7 @@ export SERPAPI_KEY=...
 | After that | $3.50 per 1,000 | about $15 per 1,000 |
 
 A typical profile costs nothing on Vision. Lens is four times the price, and the free 250 a
-month are enough for the way it earns its keep — see below.
+month are enough for the way it is used below.
 
 Run `--dry-run` with either and it will tell you exactly how many searches it would make and
 what they would cost before spending anything. It prices against what that engine has already
@@ -196,15 +196,14 @@ adapters/     the details: sqlite_repository, vision, serpapi, http_fetcher,
 cli.py        the composition root — the one module that knows every layer
 ```
 
-Adding a third engine means writing one `SearchEngine` and wiring it in `cli.py`. That is not
-a claim, it is what happened: Lens arrived as `adapters/serpapi.py` without a line of
-`domain.py` changing.
+Adding a third engine means writing one `SearchEngine` and wiring it in `cli.py`. Lens arrived
+as `adapters/serpapi.py` without a line of `domain.py` changing.
 
 ## Development
 
 ```bash
 uv sync --all-groups
-uv run pytest             # 130 tests, no network, no mocks
+uv run pytest             # 131 tests, no network, no mocks
 uv run ruff check .
 uv run ruff format .
 uv run mypy               # strict, and it passes on the tests too
