@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/Endika/imgtrail/compare/v0.7.2...v0.7.3) (2026-09-27)
+
+
+### Documentation
+
+* drop an accuracy comparison the measured sample cannot support ([4439aa2](https://github.com/Endika/imgtrail/commit/4439aa2879a017ac1ffff944bbac711666b01171))
+
 ## [0.7.2](https://github.com/Endika/imgtrail/compare/v0.7.1...v0.7.2) (2026-09-27)
 
 
