@@ -99,8 +99,7 @@ two clothing shops and a veterinary practice — places a photograph drifts to t
 index does not reach. Pinterest is the clearest case: it comes back from Lens and never from
 Vision, in any field of its answer.
 
-Neither is more accurate. Five of fifty-nine Lens candidates survived verification, which is
-Vision's hit rate too. They simply look in different places.
+They look in different places.
 
 So run Vision over everything, and spend Lens where the cheap engine came back empty:
 
