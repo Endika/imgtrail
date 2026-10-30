@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
-from enum import Enum
+from enum import StrEnum
 from typing import TypeGuard
 from urllib.parse import urlparse
 
@@ -67,12 +67,12 @@ class Fingerprint:
         return self.value
 
 
-class MatchKind(str, Enum):
+class MatchKind(StrEnum):
     FULL = "full"
     PARTIAL = "partial"
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
     LIKELY = "likely"
