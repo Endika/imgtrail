@@ -286,7 +286,7 @@ wheels = [
 
 [[package]]
 name = "imgtrail"
-version = "0.7.3"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

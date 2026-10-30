@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/Endika/imgtrail/compare/v0.7.3...v1.0.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** require Python 3.11 and Pillow 13
+
+### Bug Fixes
+
+* **deps:** require Python 3.11 and Pillow 13 ([6315c08](https://github.com/Endika/imgtrail/commit/6315c083b5671d198c8356d7f6a32207556f97fa))
+
 ## [0.7.3](https://github.com/Endika/imgtrail/compare/v0.7.2...v0.7.3) (2026-09-27)
 
 
